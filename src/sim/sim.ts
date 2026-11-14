@@ -7,7 +7,7 @@ import { Rng, hash32, hashFrac } from './rng';
 import { FEATURE, difficulty, rockfallOn, windStrength } from './zones';
 
 /** Bump this whenever a rule changes: stored input logs only replay under the version that made them. */
-export const SIM_VERSION = 2;
+export const SIM_VERSION = 3;
 
 export const WIDTH = 420;
 export const UNITS_PER_METER = 10;
@@ -499,17 +499,18 @@ export class Sim {
     const m = this.topY / UNITS_PER_METER;
     const d = difficulty(m);
 
-    // The next ledge on the guaranteed route.
-    let frac = 0.3 + 0.5 * d + r.range(-0.07, 0.07);
+    // The next ledge on the guaranteed route: about 7 m up at the bottom, stretching toward a full hop.
+    let frac = 0.38 + 0.42 * d + r.range(-0.07, 0.07);
     frac = Math.max(0.2, Math.min(MAX_GAP, frac));
     let y = this.topY + frac * APEX;
     const reach = 70 + 200 * d;
     const x = wrapX(this.topX + r.range(-reach, reach));
     const w = Math.max(42, 84 - 44 * d) * r.range(0.85, 1.15);
 
+    // Route ledges never crumble or fake: whatever breaks behind you, the way up is still there.
+    // (Crumbling ledges and fakes are only ever spares.)
     let kind = Kind.Normal;
     if (m >= FEATURE.ice && r.chance(0.3)) kind = Kind.Ice;
-    else if (m >= FEATURE.crumble && r.chance(0.08 + 0.3 * d)) kind = Kind.Crumble;
 
     let mx = 0;
     let my = 0;
@@ -522,7 +523,7 @@ export class Sim {
       const top = this.topY + MAX_GAP * APEX;
       if (y + my > top) y = top - my;
     }
-    const spring = kind !== Kind.Crumble && r.chance(0.05 + 0.02 * d) ? r.range(-w / 2 + 14, w / 2 - 14) : null;
+    const spring = r.chance(0.05 + 0.02 * d) ? r.range(-w / 2 + 14, w / 2 - 14) : null;
 
     const lowY = this.topY;
     this.addPlatform({ x, y, w, kind, mx, my, per, ph, spring, path: true });
@@ -542,12 +543,14 @@ export class Sim {
       this.nextPickupY = y + r.range(2200, 4200);
     }
 
-    // Spare ledges: about six ledges per bounce-height near the bottom, thinning to under three.
+    // Spare ledges. Route plus spares come to about 4.2 ledges per bounce-height at the bottom,
+    // 3.7 at 700 m and 3 at 3 km, thinning toward 2.5 (the owner found 6 at the bottom too busy).
     // A missed jump should usually leave something else to land on.
-    const want = (band / APEX) * (6 - 3.5 * d) - 1;
+    const want = (band / APEX) * (4.2 - 1.2 * d - 0.5 * d * d) - 1;
     const extras = Math.floor(want) + (r.chance(want - Math.floor(want)) ? 1 : 0);
     for (let i = 0; i < extras; i++) {
-      const ek = m >= FEATURE.crumble && r.chance(0.15 + 0.25 * d) ? Kind.Crumble : m >= FEATURE.ice && r.chance(0.3) ? Kind.Ice : Kind.Normal;
+      // Spares carry all the crumbling, a bit more of it now the route has none.
+      const ek = m >= FEATURE.crumble && r.chance(0.2 + 0.3 * d) ? Kind.Crumble : m >= FEATURE.ice && r.chance(0.3) ? Kind.Ice : Kind.Normal;
       const ew = Math.max(40, 80 - 44 * d) * r.range(0.8, 1.1);
       const emx = m >= FEATURE.moving && r.chance(0.1 + 0.25 * d) ? r.range(30, 90) : 0;
       const eper = r.int(140, 280);

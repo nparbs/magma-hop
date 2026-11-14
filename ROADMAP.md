@@ -15,6 +15,8 @@ These came from the owner's answers on 2026-11-13, corrected on 2026-11-14. Chan
 | Run ends | Falling off the bottom of the view, or one hazard hit. Players can also end a run from the pause menu. |
 | Score | Highest point reached. |
 | Difficulty | Harder as you climb, forever: smaller ledges and bigger gaps, moving and crumbling ledges, fakes, wind gusts, ice, plus springs. |
+| Always a way up | There must always be a way to keep climbing, even with breaking ledges (owner, 2026-11-14). Route ledges never crumble or fake, and from every ledge the next route ledge is within one hop. A test checks it. |
+| Ledge density | Fewer ledges in the early zones (owner, 2026-11-14): about 4.2 per hop-height at the bottom (was 6), 3.7 at 700 m, thinning toward 2.5. |
 | Board | Global, best height per climber, all time and this week. Server-issued seeds and a full server-side replay of every run. |
 | Theme and art style | Volcano escape in chunky pixel art (option B below). The owner picked it on 2026-11-14. |
 | Enemies | Collision only: stomp from above, touching them any other way is a hit. **No shooting** (owner, 2026-11-14). |

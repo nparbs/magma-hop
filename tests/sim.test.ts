@@ -38,6 +38,25 @@ describe('generation', () => {
     }
   });
 
+  it('always leaves a way up: route ledges never break, and every ledge has a route ledge within one hop above', () => {
+    for (const seed of [1, 2, 3, 99, 12345]) {
+      const sim = new Sim(seed);
+      (sim as any).generateUntil(80_000);
+      const path = sim.platforms.filter((p) => p.path).sort((a, b) => a.y - b.y);
+      for (const p of path) expect([Kind.Normal, Kind.Ice]).toContain(p.kind);
+      // From any ledge you can stand on, crumbling ones included (you bounce once before they go),
+      // the next route ledge up is in reach at its highest. A bobbing ledge counts from the middle of
+      // its swing: you can ride it there and wait.
+      let k = 0;
+      const standable = sim.platforms.filter((p) => p.kind !== Kind.Fake && p.y < path[path.length - 1].y).sort((a, b) => a.y - b.y);
+      for (const p of standable) {
+        while (k < path.length && path[k].y <= p.y) k++;
+        const next = path[k];
+        expect(next.y + next.my - p.y).toBeLessThanOrEqual(MAX_GAP * APEX + 1e-9);
+      }
+    }
+  });
+
   it('gets harder: route gaps grow and ledges shrink with height', () => {
     const sim = new Sim(7);
     (sim as any).generateUntil(60_000);

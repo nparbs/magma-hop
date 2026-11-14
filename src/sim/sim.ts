@@ -1,19 +1,22 @@
 // The whole game's rules. No DOM, no Math.sin, no clocks: the server replays runs with this file
 // and must land on exactly the same height the player saw.
 //
-// Units: x runs 0..WIDTH and wraps. y points UP, 0 is the street. 10 units = 1 meter. 60 ticks a second.
+// Units: x runs 0..WIDTH and wraps. y points UP, 0 is the chamber floor. 10 units = 1 meter. 60 ticks a second.
 
 import { Rng, hash32, hashFrac } from './rng';
-import { FEATURE, difficulty, lightningOn, windStrength } from './zones';
+import { FEATURE, difficulty, rockfallOn, windStrength } from './zones';
+
+/** Bump this whenever a rule changes: stored input logs only replay under the version that made them. */
+export const SIM_VERSION = 2;
 
 export const WIDTH = 420;
 export const UNITS_PER_METER = 10;
 export const TICK_RATE = 60;
 export const GRAVITY = 0.42;
-export const BOUNCE = 13.6;
-export const SPRING = 24;
-export const STOMP = 14.6;
-export const MAX_FALL = 22;
+export const BOUNCE = 12.6;
+export const SPRING = 22;
+export const STOMP = 13.6;
+export const MAX_FALL = 20;
 export const RUN_SPEED = 6.2;
 export const STEER = 1.1;
 export const ICE_STEER = 0.13;
@@ -22,15 +25,26 @@ export const ICE_TICKS = 42;
 export const APEX = (BOUNCE * BOUNCE) / (2 * GRAVITY);
 /** The biggest gap the generator ever leaves between path platforms, as a share of APEX. */
 export const MAX_GAP = 0.86;
+/** The lava sits this far below the highest point you've reached. It never goes back down. */
+export const FALL_LIMIT = 280;
+/** Where the lava starts, below the chamber floor. */
+export const START_LAVA = 120;
 export const PLAYER_HALF = 13;
 export const PLAYER_H = 30;
-export const RESPAWN_TICKS = 300;
-export const DRONE_R = 15;
-export const DEBRIS_R = 13;
-export const BOLT_HALF = 22;
-export const BOLT_WARN = 70;
-export const BOLT_LIVE = 16;
+export const BAT_R = 15;
+export const WISP_R = 13;
+export const PICKUP_R = 14;
+export const ROCK_HALF = 22;
+export const ROCK_WARN = 70;
+export const ROCK_LIVE = 16;
 export const GUST_CYCLE = 420;
+/** Rides: how long they last (ticks) and how fast they lift you (units per tick). */
+export const GEYSER_TICKS = 80;
+export const GEYSER_SPEED = 16;
+export const BUBBLE_TICKS = 210;
+export const BUBBLE_SPEED = 15;
+/** Nothing can hurt you for this long after a ride ends or a shield breaks. */
+export const GRACE_TICKS = 50;
 /** Input is an integer -4..4: keyboard gives ±4, tilt gives the steps between. */
 export const INPUT_MAX = 4;
 
@@ -58,15 +72,15 @@ export interface Platform {
   ph: number;
   /** Spring offset from the center, or null. */
   spring: number | null;
-  /** Tick it broke, or -1. Crumbling and fake ledges come back after RESPAWN_TICKS. */
+  /** Tick it broke, or -1. Crumbling and fake ledges break for good. */
   broken: number;
   /** Part of the guaranteed route up (used by tests and the bot). */
   path: boolean;
 }
 
 export enum HazardKind {
-  Drone = 0,
-  Debris = 1,
+  Bat = 0,
+  Wisp = 1,
 }
 
 export interface Hazard {
@@ -74,14 +88,31 @@ export interface Hazard {
   kind: HazardKind;
   x: number;
   y: number;
-  /** Drone: patrol half-width and period. Debris: speed per tick (signed), period unused. */
+  /** Bat: patrol half-width and period. Wisp: speed per tick (signed), period unused. */
   a: number;
   per: number;
   ph: number;
   dead: boolean;
 }
 
-export interface Bolt {
+export enum PickupKind {
+  /** Short ride. */
+  Geyser = 0,
+  /** Long ride. */
+  Bubble = 1,
+  /** Absorbs one hit. */
+  Shield = 2,
+}
+
+export interface Pickup {
+  id: number;
+  kind: PickupKind;
+  x: number;
+  y: number;
+  taken: boolean;
+}
+
+export interface Rockfall {
   x: number;
   y: number;
   start: number;
@@ -90,9 +121,12 @@ export interface Bolt {
 export type SimEvent =
   | { t: 'bounce'; x: number; y: number; kind: Kind }
   | { t: 'spring'; x: number; y: number }
-  | { t: 'crumble'; x: number; y: number }
-  | { t: 'fake'; x: number; y: number }
+  | { t: 'crumble'; x: number; y: number; w: number }
+  | { t: 'fake'; x: number; y: number; w: number }
   | { t: 'stomp'; x: number; y: number }
+  | { t: 'pickup'; x: number; y: number; kind: PickupKind }
+  | { t: 'rideend'; x: number; y: number }
+  | { t: 'shieldbreak'; x: number; y: number }
   | { t: 'strike'; x: number; y: number }
   | { t: 'warn'; x: number; y: number }
   | { t: 'die'; x: number; y: number; cause: string };
@@ -130,7 +164,7 @@ export function platY(p: Platform, tick: number): number {
 }
 
 export function hazardPos(h: Hazard, tick: number): [number, number] {
-  if (h.kind === HazardKind.Drone) return [wrapX(h.x + h.a * tri((tick + h.ph) / h.per)), h.y];
+  if (h.kind === HazardKind.Bat) return [wrapX(h.x + h.a * tri((tick + h.ph) / h.per)), h.y];
   return [wrapX(h.x + h.a * tick), h.y + 18 * tri((tick + h.ph) / 200)];
 }
 
@@ -142,31 +176,43 @@ export class Sim {
   vx = 0;
   vy = BOUNCE;
   maxY = 0;
+  /** Top of the lava. Touching it ends the run. */
+  lavaY = -START_LAVA;
   iceTimer = 0;
   wind = 0;
+  /** The ride you're on, or -1. */
+  ride: PickupKind | -1 = -1;
+  rideTimer = 0;
+  /** Ticks left during which hazards can't hurt you. */
+  safe = 0;
+  shield = false;
   dead = false;
   cause = '';
   input = 0;
   platforms: Platform[] = [];
   hazards: Hazard[] = [];
-  bolts: Bolt[] = [];
+  pickups: Pickup[] = [];
+  rockfalls: Rockfall[] = [];
   events: SimEvent[] = [];
 
   private readonly hazardsOn: boolean;
   private gen: Rng;
-  private boltRng: Rng;
-  private nextBolt = 0;
+  private rockRng: Rng;
+  private nextRock = 0;
   private topY = 0;
   private topX = WIDTH / 2;
+  private nextPickupY = FEATURE.pickups * UNITS_PER_METER;
+  private recent: Platform[] = [];
   private nextId = 1;
   private pBuckets = new Map<number, Platform[]>();
   private hBuckets = new Map<number, Hazard[]>();
+  private uBuckets = new Map<number, Pickup[]>();
 
   constructor(seed: number, opts: SimOptions = {}) {
     this.seed = seed >>> 0;
     this.hazardsOn = opts.hazards !== false;
     this.gen = new Rng(hash32(this.seed, 1));
-    this.boltRng = new Rng(hash32(this.seed, 2));
+    this.rockRng = new Rng(hash32(this.seed, 2));
     this.generateUntil(APEX * 12);
   }
 
@@ -197,30 +243,39 @@ export class Sim {
     this.wind = this.hazardsOn ? this.windAt(t, meters) : 0;
 
     const prevY = this.y;
-    this.vy -= GRAVITY;
-    if (this.vy < -MAX_FALL) this.vy = -MAX_FALL;
+    const riding = this.ride !== -1;
+    if (riding) {
+      this.vy = this.ride === PickupKind.Geyser ? GEYSER_SPEED : BUBBLE_SPEED;
+      if (--this.rideTimer <= 0) {
+        // Let go with one bounce's worth of lift, so there's time to pick a ledge.
+        this.ride = -1;
+        this.vy = BOUNCE;
+        this.events.push({ t: 'rideend', x: this.x, y: this.y });
+      }
+    } else {
+      this.vy -= GRAVITY;
+      if (this.vy < -MAX_FALL) this.vy = -MAX_FALL;
+    }
     this.x = wrapX(this.x + this.vx + this.wind);
     this.y += this.vy;
 
-    if (this.vy < 0) this.land(prevY, t);
-    if (this.y <= 0) {
-      this.y = 0;
-      this.vy = BOUNCE;
-      this.events.push({ t: 'bounce', x: this.x, y: 0, kind: Kind.Normal });
-    }
+    if (!riding && this.vy < 0) this.land(prevY, t);
     if (this.y > this.maxY) this.maxY = this.y;
-
-    // Broken ledges come back.
-    for (const p of this.near(this.pBuckets, this.y, 3)) {
-      if (p.broken >= 0 && t - p.broken >= RESPAWN_TICKS) p.broken = -1;
+    if (this.maxY - FALL_LIMIT > this.lavaY) this.lavaY = this.maxY - FALL_LIMIT;
+    if (this.y < this.lavaY) {
+      this.die('lava');
+      return;
     }
 
+    this.touchPickups();
+    if (this.safe > 0) this.safe--;
     if (this.hazardsOn) {
       this.touchHazards(prevY, t);
-      this.lightning(t, meters);
+      if (!this.dead) this.rockfall(t, meters);
     }
 
     if (this.maxY + APEX * 8 > this.topY) this.generateUntil(this.maxY + APEX * 12);
+    if ((t & 127) === 0) this.prune();
   }
 
   /** Every bucket within `span` of y. */
@@ -242,8 +297,9 @@ export class Sim {
       if (prevY < pyPrev - 0.001 || this.y > py) continue;
       if (Math.abs(wrapDx(this.x, platX(p, t))) > p.w / 2 + PLAYER_HALF * 0.7) continue;
       if (p.kind === Kind.Fake) {
+        // It snaps and you drop straight through.
         p.broken = t;
-        this.events.push({ t: 'fake', x: platX(p, t), y: py });
+        this.events.push({ t: 'fake', x: platX(p, t), y: py, w: p.w });
         continue;
       }
       if (py > bestY) {
@@ -254,7 +310,7 @@ export class Sim {
     if (!best) return;
     const px = platX(best, t);
     this.y = bestY;
-    if (best.spring !== null && Math.abs(wrapDx(px + best.spring, this.x)) <= 15) {
+    if (best.spring !== null && Math.abs(wrapDx(px + best.spring, this.x)) <= 16) {
       this.vy = SPRING;
       this.events.push({ t: 'spring', x: this.x, y: bestY });
     } else {
@@ -263,12 +319,43 @@ export class Sim {
     }
     if (best.kind === Kind.Crumble) {
       best.broken = t;
-      this.events.push({ t: 'crumble', x: px, y: bestY });
+      this.events.push({ t: 'crumble', x: px, y: bestY, w: best.w });
     } else if (best.kind === Kind.Ice) {
       this.iceTimer = ICE_TICKS;
       const cap = RUN_SPEED * 1.3;
       this.vx = Math.max(-cap, Math.min(cap, this.vx * 1.3));
     }
+  }
+
+  private touchPickups(): void {
+    const cy = this.y + PLAYER_H / 2;
+    for (const u of this.near(this.uBuckets, this.y, 1)) {
+      if (u.taken) continue;
+      if (Math.abs(wrapDx(this.x, u.x)) > PICKUP_R + PLAYER_HALF) continue;
+      if (Math.abs(u.y - cy) > PICKUP_R + PLAYER_H / 2) continue;
+      if (u.kind === PickupKind.Shield) {
+        if (this.shield) continue;
+        this.shield = true;
+      } else {
+        if (this.ride !== -1) continue;
+        this.ride = u.kind;
+        this.rideTimer = u.kind === PickupKind.Geyser ? GEYSER_TICKS : BUBBLE_TICKS;
+        this.safe = this.rideTimer + GRACE_TICKS;
+        this.iceTimer = 0;
+      }
+      u.taken = true;
+      this.events.push({ t: 'pickup', x: u.x, y: u.y, kind: u.kind });
+    }
+  }
+
+  /** True if the hit was soaked up by a ride, the grace period or the shield. */
+  private absorb(): boolean {
+    if (this.safe > 0) return true;
+    if (!this.shield) return false;
+    this.shield = false;
+    this.safe = GRACE_TICKS;
+    this.events.push({ t: 'shieldbreak', x: this.x, y: this.y });
+    return true;
   }
 
   private touchHazards(prevY: number, t: number): void {
@@ -279,38 +366,46 @@ export class Sim {
       const [hx, hy] = hazardPos(h, t);
       const dx = wrapDx(cx, hx);
       const dy = hy - cy;
-      const r = (h.kind === HazardKind.Drone ? DRONE_R : DEBRIS_R) + 11;
+      const r = (h.kind === HazardKind.Bat ? BAT_R : WISP_R) + 11;
       if (dx * dx + dy * dy >= r * r) continue;
-      // Falling onto a drone from above squashes it and bounces you.
-      if (h.kind === HazardKind.Drone && this.vy < 0 && prevY >= hy) {
+      const bat = h.kind === HazardKind.Bat;
+      // Falling onto a bat from above squashes it and bounces you.
+      if (bat && this.ride === -1 && this.vy < 0 && prevY >= hy) {
         h.dead = true;
         this.vy = STOMP;
         this.events.push({ t: 'stomp', x: hx, y: hy });
         continue;
       }
-      this.die(h.kind === HazardKind.Drone ? 'drone' : 'debris');
+      if (this.absorb()) {
+        if (bat) {
+          h.dead = true;
+          this.events.push({ t: 'stomp', x: hx, y: hy });
+        }
+        continue;
+      }
+      this.die(bat ? 'bat' : 'wisp');
       return;
     }
   }
 
-  private lightning(t: number, meters: number): void {
-    this.bolts = this.bolts.filter((b) => t - b.start <= BOLT_WARN + BOLT_LIVE);
-    if (lightningOn(meters) && t >= this.nextBolt) {
+  private rockfall(t: number, meters: number): void {
+    this.rockfalls = this.rockfalls.filter((b) => t - b.start <= ROCK_WARN + ROCK_LIVE);
+    if (rockfallOn(meters) && t >= this.nextRock && this.ride === -1) {
       const d = difficulty(meters);
-      const r = this.boltRng;
+      const r = this.rockRng;
       const aimed = r.chance(0.55);
       const x = aimed ? wrapX(this.x + r.range(-40, 40)) : r.range(0, WIDTH);
-      const bolt = { x, y: this.y, start: t };
-      this.bolts.push(bolt);
+      this.rockfalls.push({ x, y: this.y, start: t });
       this.events.push({ t: 'warn', x, y: this.y });
-      this.nextBolt = t + Math.floor(150 - 70 * d + r.range(0, 120));
+      this.nextRock = t + Math.floor(170 - 70 * d + r.range(0, 120));
     }
-    for (const b of this.bolts) {
+    for (const b of this.rockfalls) {
       const age = t - b.start;
-      if (age === BOLT_WARN) this.events.push({ t: 'strike', x: b.x, y: b.y });
-      if (age < BOLT_WARN || age > BOLT_WARN + BOLT_LIVE) continue;
-      if (Math.abs(wrapDx(this.x, b.x)) < BOLT_HALF + PLAYER_HALF * 0.6 && Math.abs(this.y - b.y) < 520) {
-        this.die('lightning');
+      if (age === ROCK_WARN) this.events.push({ t: 'strike', x: b.x, y: b.y });
+      if (age < ROCK_WARN || age > ROCK_WARN + ROCK_LIVE) continue;
+      if (Math.abs(wrapDx(this.x, b.x)) < ROCK_HALF + PLAYER_HALF * 0.6 && Math.abs(this.y - b.y) < 520) {
+        if (this.absorb()) continue;
+        this.die('rockfall');
         return;
       }
     }
@@ -347,30 +442,53 @@ export class Sim {
     this.events.push({ t: 'die', x: this.x, y: this.y, cause });
   }
 
+  /** Forget everything the lava has swallowed, so long runs stay fast. */
+  private prune(): void {
+    const cut = this.lavaY - 160;
+    this.platforms = this.platforms.filter((p) => p.y + p.my >= cut);
+    this.hazards = this.hazards.filter((h) => h.y >= cut);
+    this.pickups = this.pickups.filter((u) => u.y >= cut);
+    const b = Math.floor(cut / BUCKET) - 1;
+    for (const map of [this.pBuckets, this.hBuckets, this.uBuckets]) {
+      for (const k of map.keys()) if (k < b) map.delete(k);
+    }
+  }
+
   // ---------- Level generation ----------
+
+  private bucket<T extends { y: number }>(map: Map<number, T[]>, item: T): void {
+    const b = Math.floor(item.y / BUCKET);
+    let list = map.get(b);
+    if (!list) map.set(b, (list = []));
+    list.push(item);
+  }
 
   private addPlatform(p: Omit<Platform, 'id' | 'broken'>): Platform {
     const full: Platform = { ...p, id: this.nextId++, broken: -1 };
     this.platforms.push(full);
-    const b = Math.floor(p.y / BUCKET);
-    let list = this.pBuckets.get(b);
-    if (!list) this.pBuckets.set(b, (list = []));
-    list.push(full);
+    this.bucket(this.pBuckets, full);
+    this.recent.push(full);
+    if (this.recent.length > 10) this.recent.shift();
     return full;
   }
 
   private addHazard(h: Omit<Hazard, 'id' | 'dead'>): void {
     const full: Hazard = { ...h, id: this.nextId++, dead: false };
     this.hazards.push(full);
-    const b = Math.floor(h.y / BUCKET);
-    let list = this.hBuckets.get(b);
-    if (!list) this.hBuckets.set(b, (list = []));
-    list.push(full);
+    this.bucket(this.hBuckets, full);
+  }
+
+  /** Would a ledge here sit on top of one just placed? */
+  private crowded(x: number, y: number, w: number): boolean {
+    for (const p of this.recent) {
+      if (Math.abs(p.y - y) < 20 + p.my && Math.abs(wrapDx(p.x, x)) < (p.w + w) / 2 + 12 + p.mx) return true;
+    }
+    return false;
   }
 
   private generateUntil(y: number): void {
     if (this.platforms.length === 0) {
-      // The street: a wide ledge to start on (the ground also bounces).
+      // The chamber floor: one ledge as wide as the shaft to start on.
       this.addPlatform({ x: WIDTH / 2, y: 0, w: WIDTH, kind: Kind.Normal, mx: 0, my: 0, per: 1, ph: 0, spring: null, path: true });
     }
     while (this.topY < y) this.genStep();
@@ -382,12 +500,12 @@ export class Sim {
     const d = difficulty(m);
 
     // The next ledge on the guaranteed route.
-    let frac = 0.26 + 0.56 * d + r.range(-0.08, 0.08);
-    frac = Math.max(0.18, Math.min(MAX_GAP, frac));
+    let frac = 0.3 + 0.5 * d + r.range(-0.07, 0.07);
+    frac = Math.max(0.2, Math.min(MAX_GAP, frac));
     let y = this.topY + frac * APEX;
-    const reach = 60 + 220 * d;
+    const reach = 70 + 200 * d;
     const x = wrapX(this.topX + r.range(-reach, reach));
-    const w = Math.max(40, 100 - 56 * d) * r.range(0.85, 1.15);
+    const w = Math.max(42, 84 - 44 * d) * r.range(0.85, 1.15);
 
     let kind = Kind.Normal;
     if (m >= FEATURE.ice && r.chance(0.3)) kind = Kind.Ice;
@@ -404,7 +522,7 @@ export class Sim {
       const top = this.topY + MAX_GAP * APEX;
       if (y + my > top) y = top - my;
     }
-    const spring = kind !== Kind.Crumble && r.chance(0.05 + 0.02 * d) ? r.range(-w / 2 + 12, w / 2 - 12) : null;
+    const spring = kind !== Kind.Crumble && r.chance(0.05 + 0.02 * d) ? r.range(-w / 2 + 14, w / 2 - 14) : null;
 
     const lowY = this.topY;
     this.addPlatform({ x, y, w, kind, mx, my, per, ph, spring, path: true });
@@ -412,44 +530,51 @@ export class Sim {
     this.topX = x;
     const band = y - lowY;
 
-    // Spare ledges make low zones forgiving. They thin out as you climb.
-    const extras = r.chance(1 - d) ? r.int(0, Math.round(2.4 * (1 - d))) : 0;
+    // A ride or a shield resting on a still, solid route ledge every few hundred meters.
+    if (y >= this.nextPickupY && mx === 0 && my === 0 && kind === Kind.Normal && spring === null) {
+      const roll = r.next();
+      let pk = roll < 0.4 ? PickupKind.Shield : roll < 0.8 ? PickupKind.Geyser : PickupKind.Bubble;
+      if (pk === PickupKind.Bubble && m < FEATURE.bubble) pk = PickupKind.Geyser;
+      if (pk === PickupKind.Shield && m < FEATURE.bats) pk = PickupKind.Geyser;
+      const u: Pickup = { id: this.nextId++, kind: pk, x, y: y + PICKUP_R + 2, taken: false };
+      this.pickups.push(u);
+      this.bucket(this.uBuckets, u);
+      this.nextPickupY = y + r.range(2200, 4200);
+    }
+
+    // Spare ledges: about six ledges per bounce-height near the bottom, thinning to under three.
+    // A missed jump should usually leave something else to land on.
+    const want = (band / APEX) * (6 - 3.5 * d) - 1;
+    const extras = Math.floor(want) + (r.chance(want - Math.floor(want)) ? 1 : 0);
     for (let i = 0; i < extras; i++) {
-      const ek = m >= FEATURE.crumble && r.chance(0.3) ? Kind.Crumble : m >= FEATURE.ice && r.chance(0.3) ? Kind.Ice : Kind.Normal;
-      this.addPlatform({
-        x: r.range(0, WIDTH),
-        y: lowY + band * r.range(0.2, 0.9),
-        w: Math.max(36, 90 - 50 * d) * r.range(0.8, 1.1),
-        kind: ek,
-        mx: m >= FEATURE.moving && r.chance(0.3) ? r.range(30, 90) : 0,
-        my: 0,
-        per: r.int(140, 280),
-        ph: r.int(0, 600),
-        spring: null,
-        path: false,
-      });
+      const ek = m >= FEATURE.crumble && r.chance(0.15 + 0.25 * d) ? Kind.Crumble : m >= FEATURE.ice && r.chance(0.3) ? Kind.Ice : Kind.Normal;
+      const ew = Math.max(40, 80 - 44 * d) * r.range(0.8, 1.1);
+      const emx = m >= FEATURE.moving && r.chance(0.1 + 0.25 * d) ? r.range(30, 90) : 0;
+      const eper = r.int(140, 280);
+      const eph = r.int(0, 600);
+      for (let tries = 0; tries < 4; tries++) {
+        const ex = r.range(0, WIDTH);
+        const ey = lowY + band * r.range(0.1, 0.95);
+        if (this.crowded(ex, ey, ew + emx * 2)) continue;
+        this.addPlatform({ x: ex, y: ey, w: ew, kind: ek, mx: emx, my: 0, per: eper, ph: eph, spring: null, path: false });
+        break;
+      }
     }
 
     // Fakes that look almost real.
-    if (m >= FEATURE.fakes && r.chance(0.12 + 0.45 * d)) {
-      this.addPlatform({
-        x: wrapX(x + r.range(80, WIDTH - 80)),
-        y: lowY + band * r.range(0.4, 1.1),
-        w: w * r.range(0.9, 1.1),
-        kind: Kind.Fake,
-        mx: 0,
-        my: 0,
-        per: 1,
-        ph: 0,
-        spring: null,
-        path: false,
-      });
+    if (m >= FEATURE.fakes && r.chance(0.1 + 0.4 * d)) {
+      const fx = wrapX(x + r.range(80, WIDTH - 80));
+      const fy = lowY + band * r.range(0.3, 1);
+      const fw = w * r.range(0.9, 1.1);
+      if (!this.crowded(fx, fy, fw)) {
+        this.addPlatform({ x: fx, y: fy, w: fw, kind: Kind.Fake, mx: 0, my: 0, per: 1, ph: 0, spring: null, path: false });
+      }
     }
 
-    // Drones patrol between ledges, kept clear of the route ledge itself.
-    if (m >= FEATURE.drones && band > 90 && r.chance(0.06 + 0.32 * d)) {
+    // Bats patrol between ledges, kept clear of the route ledge itself.
+    if (m >= FEATURE.bats && band > 60 && r.chance(0.04 + 0.22 * d)) {
       this.addHazard({
-        kind: HazardKind.Drone,
+        kind: HazardKind.Bat,
         x: r.range(0, WIDTH),
         y: lowY + band * r.range(0.4, 0.6),
         a: r.range(50, 90 + 110 * d),
@@ -457,9 +582,9 @@ export class Sim {
         ph: r.int(0, 600),
       });
     }
-    if (m >= FEATURE.debris && band > 90 && r.chance(0.05 + 0.25 * d)) {
+    if (m >= FEATURE.wisps && band > 60 && r.chance(0.04 + 0.2 * d)) {
       this.addHazard({
-        kind: HazardKind.Debris,
+        kind: HazardKind.Wisp,
         x: r.range(0, WIDTH),
         y: lowY + band * r.range(0.35, 0.65),
         a: (r.chance(0.5) ? 1 : -1) * r.range(1.2, 1.6 + 2 * d),

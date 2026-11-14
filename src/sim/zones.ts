@@ -1,24 +1,57 @@
-// The tower's bands, by height in meters. Pure data: the sim reads the rules, the page reads the colors.
+// The volcano's bands, by height in meters. Pure data: the sim reads the rules, the page reads the colors.
+
+export type Decor = 'pillar' | 'crystal' | 'bone' | 'icicle' | 'crag' | 'cloud';
+export type Mote = 'ember' | 'glint' | 'dust' | 'snow' | 'ash';
 
 export interface Zone {
   name: string;
   /** Height in meters where this zone begins. */
   from: number;
-  /** Sky gradient: top, bottom. */
+  /** Background: top, bottom. */
   sky: [string, string];
-  /** Platform face and edge colors. */
-  plat: [string, string];
+  /** Far rock layer and near rock layer. */
+  rock: [string, string];
+  /** Ledge colors: glowing top edge, lit rock, dark rock. */
+  plat: [string, string, string];
+  /** What the far layer is made of, and what drifts in the air. */
+  decor: Decor;
+  mote: Mote;
+  moteColor: string;
   /** What the HUD says when you arrive. */
   intro: string;
 }
 
 export const ZONES: Zone[] = [
-  { name: 'Rooftops', from: 0, sky: ['#ff9a76', '#ffd8a8'], plat: ['#f3ece4', '#8b6f8e'], intro: 'Bounce up. Steer with ← →' },
-  { name: 'Cloudline', from: 250, sky: ['#6fb7ff', '#cfe9ff'], plat: ['#ffffff', '#b7cbe6'], intro: 'Platforms start to drift and crumble' },
-  { name: 'Thunderhead', from: 700, sky: ['#3a3f6b', '#7c7fa8'], plat: ['#9aa3c7', '#5c6488'], intro: 'Wind gusts. Lightning. Keep moving' },
-  { name: 'Glacier Sky', from: 1300, sky: ['#1d3b5c', '#5fa8c9'], plat: ['#c8f1ff', '#7cc4e0'], intro: 'Ice is slippery. Some ledges bob' },
-  { name: 'Low Orbit', from: 2000, sky: ['#0b1030', '#2a2f6b'], plat: ['#b0b8d8', '#6c7499'], intro: 'Watch for drifting debris' },
-  { name: 'The Void', from: 3000, sky: ['#05030d', '#1c0b2e'], plat: ['#d18cff', '#7a3fb0'], intro: 'Everything, all at once. Forever' },
+  {
+    name: 'Magma Chamber', from: 0, sky: ['#2a0d12', '#5a1608'], rock: ['#3d1512', '#1c0a0c'],
+    plat: ['#ffb02e', '#7a3b2a', '#3a1c1a'], decor: 'pillar', mote: 'ember', moteColor: '#ff9a3c',
+    intro: 'The lava is rising. Bounce up!',
+  },
+  {
+    name: 'Crystal Caves', from: 250, sky: ['#140f2e', '#2b1245'], rock: ['#2a1d52', '#120c26'],
+    plat: ['#6ff2e0', '#4a3a86', '#221a48'], decor: 'crystal', mote: 'glint', moteColor: '#9af7ff',
+    intro: 'Ledges drift, crack and crumble',
+  },
+  {
+    name: 'Fossil Beds', from: 700, sky: ['#1d1710', '#3b2a17'], rock: ['#4a3924', '#211a12'],
+    plat: ['#f0d9a0', '#8a6a42', '#40301e'], decor: 'bone', mote: 'dust', moteColor: '#d9c08a',
+    intro: 'Steam gusts. Rockfalls. Keep moving',
+  },
+  {
+    name: 'Ice Cap', from: 1300, sky: ['#0c2238', '#1e4a66'], rock: ['#2a5876', '#0f2a40'],
+    plat: ['#e8fbff', '#6aa9c9', '#2c5878'], decor: 'icicle', mote: 'snow', moteColor: '#e8fbff',
+    intro: 'Ice is slippery. Some ledges bob',
+  },
+  {
+    name: 'Crater Rim', from: 2000, sky: ['#0a0a1e', '#3a1420'], rock: ['#2c1a22', '#120a10'],
+    plat: ['#ff6a3c', '#5a3038', '#2a161c'], decor: 'crag', mote: 'ember', moteColor: '#ffb84a',
+    intro: 'Fire wisps drift across the vent',
+  },
+  {
+    name: 'Ash Clouds', from: 3000, sky: ['#17141c', '#3a2f38'], rock: ['#4a4450', '#26222c'],
+    plat: ['#ffd9f2', '#75697f', '#3a3340'], decor: 'cloud', mote: 'ash', moteColor: '#c9c0cf',
+    intro: 'Everything, all at once. Forever',
+  },
 ];
 
 export function zoneIndexAt(meters: number): number {
@@ -29,16 +62,18 @@ export function zoneIndexAt(meters: number): number {
 
 /** Where each hazard and platform trick starts, in meters. */
 export const FEATURE = {
-  drones: 150,
+  pickups: 100,
+  bats: 150,
   moving: 220,
   crumble: 300,
   fakes: 350,
+  bubble: 400,
   wind: 700,
-  lightning: 760,
+  rockfall: 760,
   ice: 1300,
   bobbing: 1300,
-  debris: 2000,
-  void: 3000,
+  wisps: 2000,
+  ash: 3000,
 } as const;
 
 /** 0 at the bottom, creeping toward 1 forever. Every difficulty dial reads this. */
@@ -47,12 +82,12 @@ export const difficulty = (meters: number) => (meters <= 0 ? 0 : meters / (meter
 /** Strongest gust, in world units per tick, at this height. 0 means calm. */
 export function windStrength(meters: number): number {
   if (meters < FEATURE.wind) return 0;
-  if (meters < FEATURE.ice) return 1.5 + 0.5 * ((meters - FEATURE.wind) / (FEATURE.ice - FEATURE.wind));
-  if (meters < FEATURE.debris) return 1.0;
-  if (meters < FEATURE.void) return 0;
-  return 1.6 + 0.6 * difficulty(meters);
+  if (meters < FEATURE.ice) return 1.2 + 0.4 * ((meters - FEATURE.wind) / (FEATURE.ice - FEATURE.wind));
+  if (meters < FEATURE.wisps) return 0.8;
+  if (meters < FEATURE.ash) return 0;
+  return 1.3 + 0.6 * difficulty(meters);
 }
 
-export function lightningOn(meters: number): boolean {
-  return (meters >= FEATURE.lightning && meters < FEATURE.ice) || meters >= FEATURE.void;
+export function rockfallOn(meters: number): boolean {
+  return (meters >= FEATURE.rockfall && meters < FEATURE.ice) || meters >= FEATURE.ash;
 }

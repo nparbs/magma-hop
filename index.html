@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-    <meta name="theme-color" content="#1c1440" />
-    <meta name="description" content="Bounce up an endless sky tower. Steer left and right, dodge drones and lightning, and climb the height board." />
+    <meta name="theme-color" content="#1a0808" />
+    <meta name="description" content="Bounce up an erupting volcano with the lava right behind you. Steer left and right, never fall, and climb the height board." />
     <title>Updraft</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1440'/%3E%3Ccircle cx='32' cy='28' r='15' fill='%23ffb347' stroke='%237a3f12' stroke-width='3'/%3E%3Crect x='22' y='21' width='20' height='12' rx='6' fill='%2320253a'/%3E%3Ccircle cx='36' cy='27' r='4' fill='%237dfcc6'/%3E%3Cpath d='M24 46 l6 4 l-6 4 l6 4' stroke='%23c7cbe0' stroke-width='3' fill='none'/%3E%3C/svg%3E" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' fill='%231a0808'/%3E%3Crect x='7' y='1' width='2' height='2' fill='%23ff7a1e'/%3E%3Crect x='4' y='3' width='8' height='8' fill='%23ffc23a'/%3E%3Crect x='3' y='5' width='10' height='4' fill='%23ffc23a'/%3E%3Crect x='4' y='9' width='8' height='2' fill='%23ff7a1e'/%3E%3Crect x='5' y='5' width='2' height='3' fill='%23fff'/%3E%3Crect x='9' y='5' width='2' height='3' fill='%23fff'/%3E%3Crect x='6' y='6' width='1' height='2' fill='%232a0d12'/%3E%3Crect x='10' y='6' width='1' height='2' fill='%232a0d12'/%3E%3Crect y='13' width='16' height='3' fill='%23f0541a'/%3E%3Crect y='13' width='16' height='1' fill='%23ffe066'/%3E%3C/svg%3E" />
   </head>
   <body>
     <canvas id="game"></canvas>
@@ -26,7 +26,7 @@
     <section id="title" class="panel-wrap">
       <div class="panel title-panel">
         <h1 class="logo">UP<span>DRAFT</span></h1>
-        <p class="tag">Bounce up the endless sky tower. How high can you get?</p>
+        <p class="tag">The volcano is waking up. Bounce out ahead of the lava.</p>
         <label class="name-row">
           <span>Your name on the board</span>
           <input id="nameInput" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Climber" />
@@ -52,9 +52,10 @@
           <li><b>You bounce by yourself.</b> Land on a ledge and you spring up again.</li>
           <li><b>Steer left and right:</b> ← → or A / D, a gamepad, or hold the left or right half of the screen. Phones can use tilt too.</li>
           <li><b>The edges wrap.</b> Go off one side and you come back on the other.</li>
-          <li><b>No checkpoints.</b> Miss and you fall onto whatever is below. Your score is the highest point you reached, so a fall only costs time.</li>
-          <li><b>One hit ends the run.</b> Drones, lightning and space junk. You can squash a drone by landing on it from above.</li>
-          <li><b>It gets harder as you climb:</b> smaller ledges, bigger gaps, drifting and crumbling ledges, fakes with a faint dotted underside, wind gusts (watch the arrow), ice, and springs for a big boost.</li>
+          <li><b>Don't fall.</b> The view only moves up and the lava follows it. Drop off the bottom and the run is over. Your score is the highest point you reached.</li>
+          <li><b>One hit ends the run too:</b> fire bats, rockfalls and fire wisps. You can squash a bat by landing on it from above.</li>
+          <li><b>Grab what you find:</b> a steaming geyser vent or a lava bubble carries you up the shaft, safe from everything. A blue shell blocks one hit. Puffcap mushrooms give a big bounce.</li>
+          <li><b>It gets harder as you climb:</b> smaller ledges, bigger gaps, drifting ledges, cracked ledges that break after one bounce, fakes whose glowing edge is broken up, steam gusts (watch the arrow) and ice.</li>
         </ul>
         <button class="btn close">Got it</button>
       </div>

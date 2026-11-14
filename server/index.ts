@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes, randomInt } from 'node:crypto';
 import { Store, playerKey, weekStart } from './db';
-import { INPUT_MAX, TICK_RATE, replay } from '../src/sim/sim';
+import { INPUT_MAX, SIM_VERSION, TICK_RATE, replay } from '../src/sim/sim';
 import { cleanName } from '../src/sim/names';
 
 declare const __APP_VERSION__: string;
@@ -149,7 +149,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
     const runId = randomBytes(12).toString('base64url');
     const seed = randomInt(1, 2 ** 31);
     pending.set(runId, { seed, issued: Date.now() });
-    return send(res, 200, { runId, seed });
+    return send(res, 200, { runId, seed, sim: SIM_VERSION });
   }
 
   if (url.pathname === '/api/finish' && req.method === 'POST') {
@@ -178,7 +178,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
     const player = playerKey(body.player);
     const name = cleanName(body.name);
     const week = weekStart();
-    if (r.meters > 0) store.add({ player, name, meters: r.meters, ticks, cause: r.cause || 'quit', seed: run.seed, log: body.log });
+    if (r.meters > 0) store.add({ player, name, meters: r.meters, ticks, cause: r.cause || 'quit', seed: run.seed, log: body.log, sim: SIM_VERSION });
     return send(res, 200, {
       meters: r.meters,
       best: store.best(player, 0) ?? r.meters,
@@ -208,7 +208,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
 const server = http.createServer((req, res) => {
   const url = new URL(req.url ?? '/', 'http://x');
   if (url.pathname === '/health') {
-    return send(res, 200, { ok: true, version: __APP_VERSION__, climbers: store.climbers(), pending: pending.size });
+    return send(res, 200, { ok: true, version: __APP_VERSION__, sim: SIM_VERSION, climbers: store.climbers(), pending: pending.size });
   }
   if (url.pathname.startsWith('/api/')) {
     api(req, res, url).catch((e) => {

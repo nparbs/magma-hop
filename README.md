@@ -1,8 +1,8 @@
 # Updraft
 
-Bounce up an endless sky tower. You bounce on every ledge by yourself, and you only steer left and right. The edges wrap, there are no checkpoints, and one hit from a drone, lightning or space junk ends the run. Your score is the highest point you reach, and the global board keeps the best climbs.
+Bounce out of an erupting volcano with the lava right behind you. You bounce on every ledge by yourself, and you only steer left and right. The edges wrap, the view only moves up, and the run ends if you drop into the lava or take one hit from a fire bat, a rockfall or a fire wisp. Geysers and lava bubbles carry you up the shaft, and a shell blocks one hit. Your score is the highest point you reach, and the global board keeps the best climbs.
 
-Vanilla TypeScript and Canvas 2D on the page, Node and SQLite on the server. All art and sound are made in code.
+Vanilla TypeScript and Canvas 2D on the page, Node and SQLite on the server. The pixel art and the sound are all made in code.
 
 ## Run it
 
@@ -20,9 +20,9 @@ Without the server the game still plays, but runs aren't ranked.
 
 | Path | What |
 | --- | --- |
-| `src/sim/sim.ts` | The rules: physics, level generation, hazards, input recording and replay. No DOM. The server runs this file. |
+| `src/sim/sim.ts` | The rules: physics, the lava, level generation, hazards, rides and shells, input recording and replay. No DOM. The server runs this file. |
 | `src/sim/zones.ts` | Zone heights, colors, when each feature starts, the difficulty curve, wind. |
-| `src/sim/bot.ts` | A simple climber for the title screen and tests. |
+| `src/sim/bot.ts` | A climber for the title screen and tests. It picks ledges it can still land on. |
 | `src/game/` | The page: loop and screens (`main.ts`), drawing (`render.ts`), input, sound, board calls. |
 | `server/` | HTTP server: static files, `/api/start`, `/api/finish`, `/api/board`, `/health`. SQLite in `db.ts`. |
 | `scripts/` | Server build, screenshots, `climb.ts` bot stats, `ship.mjs`. |

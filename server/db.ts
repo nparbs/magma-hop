@@ -43,12 +43,15 @@ export class Store {
       CREATE INDEX IF NOT EXISTS runs_player ON runs (player, meters DESC);
       CREATE INDEX IF NOT EXISTS runs_created ON runs (created);
     `);
+    // Which version of the rules a run was played under. Runs from before this column are version 1.
+    const cols = this.db.prepare('PRAGMA table_info(runs)').all() as { name: string }[];
+    if (!cols.some((c) => c.name === 'sim')) this.db.exec('ALTER TABLE runs ADD COLUMN sim INTEGER NOT NULL DEFAULT 1');
   }
 
-  add(r: { player: string; name: string; meters: number; ticks: number; cause: string; seed: number; log: number[] }): void {
+  add(r: { player: string; name: string; meters: number; ticks: number; cause: string; seed: number; log: number[]; sim: number }): void {
     this.db
-      .prepare('INSERT INTO runs (player, name, meters, ticks, cause, seed, log, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(r.player, r.name, r.meters, r.ticks, r.cause, r.seed, JSON.stringify(r.log), Date.now());
+      .prepare('INSERT INTO runs (player, name, meters, ticks, cause, seed, log, created, sim) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(r.player, r.name, r.meters, r.ticks, r.cause, r.seed, JSON.stringify(r.log), Date.now(), r.sim);
     // A climber's newest name shows on all their runs.
     this.db.prepare('UPDATE runs SET name = ? WHERE player = ?').run(r.name, r.player);
   }

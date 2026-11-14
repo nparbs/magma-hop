@@ -93,10 +93,32 @@ export class Sfx {
     this.noise(0.5, 0.06, 3000, 4);
   }
   strike(): void {
-    this.noise(0.9, 0.55, 300, 0.4);
-    this.tone(90, 40, 0.6, 'sawtooth', 0.2);
+    this.noise(0.7, 0.5, 220, 0.5);
+    this.tone(80, 35, 0.5, 'square', 0.16);
   }
-  die(): void {
+  /** A ride or a shell. */
+  pickup(shield: boolean): void {
+    if (shield) [880, 1320, 1760].forEach((f, i) => this.tone(f, f, 0.14, 'triangle', 0.12, i * 0.05));
+    else {
+      this.noise(0.9, 0.3, 1200, 0.5);
+      this.tone(200, 900, 0.8, 'sine', 0.16);
+    }
+  }
+  rideEnd(): void {
+    this.noise(0.25, 0.18, 2400, 0.7);
+    this.tone(900, 500, 0.2, 'sine', 0.1);
+  }
+  shieldBreak(): void {
+    this.noise(0.3, 0.35, 3200, 1.5);
+    this.tone(1500, 300, 0.3, 'triangle', 0.16);
+  }
+  die(lava = false): void {
+    if (lava) {
+      // A plop and a long sizzle.
+      this.tone(220, 50, 0.4, 'sine', 0.3);
+      this.noise(1.1, 0.4, 3500, 0.4);
+      return;
+    }
     this.tone(600, 80, 0.7, 'sawtooth', 0.18);
     this.noise(0.5, 0.35, 700, 0.6);
   }

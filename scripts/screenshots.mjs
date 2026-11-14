@@ -14,7 +14,7 @@ const browser = await chromium.launch({ executablePath: CHROME, headless: true }
 const errors = [];
 
 async function open(viewport, opts = {}) {
-  const ctx = await browser.newContext({ viewport, hasTouch: !!opts.touch, isMobile: !!opts.touch, deviceScaleFactor: 1 });
+  const ctx = await browser.newContext({ viewport, hasTouch: !!opts.touch, isMobile: !!opts.touch, deviceScaleFactor: opts.touch ? 2 : 1 });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => {
@@ -41,7 +41,8 @@ async function warp(page, meters) {
     s.x = p.x;
     s.vy = 0;
     s.maxY = s.y;
-    u.renderer.snapCamera(s.y);
+    s.lavaY = s.y - 200;
+    u.renderer.snapCamera(s.lavaY);
   }, meters);
 }
 
@@ -74,7 +75,7 @@ if (want('zones')) {
   const page = await open({ width: 1280, height: 720 });
   await page.click('#playBtn');
   await wait(page, 800);
-  for (const [m, name] of [[300, 'cloud'], [900, 'storm'], [1500, 'glacier'], [2400, 'orbit'], [3500, 'void']]) {
+  for (const [m, name] of [[300, 'crystal'], [900, 'fossil'], [1500, 'ice'], [2400, 'rim'], [3500, 'ash']]) {
     await warp(page, m);
     await wait(page, 900);
     await shot(page, `z-${name}`);
@@ -90,7 +91,7 @@ if (want('phone')) {
   await shot(page, 'p2-play');
   await warp(page, 800);
   await wait(page, 900);
-  await shot(page, 'p3-storm');
+  await shot(page, 'p3-fossil');
 }
 
 if (want('landscape')) {

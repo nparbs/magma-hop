@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Store, weekStart } from '../server/db';
 import { cleanName } from '../src/sim/names';
 
-const run = (player: string, name: string, meters: number) => ({ player, name, meters, ticks: 100, cause: 'drone', seed: 1, log: [] });
+const run = (player: string, name: string, meters: number) => ({ player, name, meters, ticks: 100, cause: 'bat', seed: 1, log: [], sim: 2 });
 
 describe('board', () => {
   it("lists each climber's best once, highest first", () => {

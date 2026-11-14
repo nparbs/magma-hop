@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { APEX, Kind, MAX_GAP, Recorder, Sim, replay } from '../src/sim/sim';
+import { APEX, BUBBLE_TICKS, FALL_LIMIT, Kind, MAX_GAP, PickupKind, Recorder, Sim, replay } from '../src/sim/sim';
 import { Bot } from '../src/sim/bot';
 
 function playBot(seed: number, ticks: number, hazards = true, careful = false) {
@@ -54,8 +54,60 @@ describe('play', () => {
   it('the route can be climbed (bot, no hazards)', () => {
     for (const seed of [1, 2, 3]) {
       const { sim } = playBot(seed, 60 * 60 * 8, false);
-      expect(sim.meters).toBeGreaterThan(1500);
+      expect(sim.meters).toBeGreaterThan(1200);
     }
+  });
+
+  it('falling into the lava ends the run, and the lava never drops', () => {
+    const { sim } = playBot(4, 60 * 20, false);
+    expect(sim.dead).toBe(false);
+    const lava = sim.lavaY;
+    expect(lava).toBeCloseTo(sim.maxY - FALL_LIMIT, 6);
+    // Steer hard one way with nothing aimed at: sooner or later there's no ledge underneath.
+    let low = lava;
+    for (let i = 0; i < 60 * 120 && !sim.dead; i++) {
+      sim.step(i % 50 < 25 ? 4 : 0);
+      expect(sim.lavaY).toBeGreaterThanOrEqual(low);
+      low = sim.lavaY;
+    }
+    expect(sim.dead).toBe(true);
+    expect(sim.cause).toBe('lava');
+  });
+
+  it('crumbling ledges break for good', () => {
+    const sim = new Sim(9, { hazards: false });
+    (sim as any).generateUntil(40_000);
+    const p = sim.platforms.find((q) => q.kind === Kind.Crumble && q.mx === 0 && q.my === 0)!;
+    sim.x = p.x;
+    sim.y = p.y + 20;
+    sim.vy = 0;
+    sim.maxY = sim.y;
+    sim.lavaY = sim.y - FALL_LIMIT;
+    while (p.broken < 0 && sim.tick < 100) sim.step(0);
+    expect(p.broken).toBeGreaterThan(0);
+    expect(sim.vy).toBeGreaterThan(0);
+    for (let i = 0; i < 400 && !sim.dead; i++) sim.step(0);
+    expect(p.broken).toBeGreaterThan(0);
+  });
+
+  it('a ride carries you up and keeps you safe', () => {
+    const sim = new Sim(10);
+    (sim as any).generateUntil(60_000);
+    const u = sim.pickups.find((q) => q.kind === PickupKind.Bubble)!;
+    expect(u).toBeTruthy();
+    expect(sim.pickups.some((q) => q.kind === PickupKind.Shield)).toBe(true);
+    sim.x = u.x;
+    sim.y = u.y;
+    sim.vy = 0;
+    sim.maxY = sim.y;
+    sim.lavaY = sim.y - FALL_LIMIT;
+    const from = sim.y;
+    sim.step(0);
+    expect(sim.ride).toBe(PickupKind.Bubble);
+    for (let i = 0; i < BUBBLE_TICKS; i++) sim.step(0);
+    expect(sim.dead).toBe(false);
+    expect(sim.ride).toBe(-1);
+    expect(sim.y - from).toBeGreaterThan(2500);
   });
 
   it('hazards end runs', () => {

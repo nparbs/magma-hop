@@ -1,9 +1,7 @@
-import '@fontsource/fredoka/500.css';
-import '@fontsource/fredoka/600.css';
-import '@fontsource/fredoka/700.css';
+import '@fontsource/jersey-15/latin-400.css';
 import './style.css';
 
-import { Kind, Recorder, Sim, TICK_RATE, UNITS_PER_METER } from '../sim/sim';
+import { Kind, PickupKind, Recorder, Sim, TICK_RATE, UNITS_PER_METER } from '../sim/sim';
 import { Bot } from '../sim/bot';
 import { ZONES, zoneIndexAt } from '../sim/zones';
 import { cleanName } from '../sim/names';
@@ -101,7 +99,7 @@ let zoneShown = 0;
 let bestAnnounced = false;
 let dyingTimer = 0;
 let topBoard: Board | null = null;
-renderer.snapCamera(sim.y);
+renderer.snapCamera(sim.lavaY);
 
 ui.name.value = store.get('name') ?? '';
 ui.name.addEventListener('change', () => store.set('name', ui.name.value.trim()));
@@ -213,7 +211,7 @@ function toTitle(): void {
   sim = new Sim(Math.floor(Math.random() * 2 ** 31));
   bot = new Bot(true);
   prev = { x: sim.x, y: sim.y };
-  renderer.snapCamera(sim.y);
+  renderer.snapCamera(sim.lavaY);
   ui.board.classList.add('hidden');
   show('title');
   void refreshMini();
@@ -234,14 +232,14 @@ async function startGame(): Promise<void> {
   bot = null;
   rec = new Recorder();
   prev = { x: sim.x, y: sim.y };
-  renderer.snapCamera(sim.y);
+  renderer.snapCamera(sim.lavaY);
   acc = 0;
   zoneShown = 0;
   bestAnnounced = localBest === 0;
   show('play');
   input.reset();
   ui.sub.textContent = run ? (localBest ? `Best ${fmt(localBest)}` : '') : 'Offline: not ranked';
-  banner(ZONES[0].name, 'Steer with ← → or hold either side of the screen');
+  banner(ZONES[0].name, matchMedia('(pointer: coarse)').matches ? 'Hold either side of the screen to steer' : 'Steer with ← → and stay ahead of the lava');
   if (matchMedia('(pointer: coarse)').matches) {
     ui.touchHint.classList.remove('hidden');
     ui.touchHint.style.animation = 'none';
@@ -286,9 +284,10 @@ document.addEventListener('visibilitychange', () => {
 });
 
 const CAUSES: Record<string, string> = {
-  drone: 'Bonked by a drone',
-  lightning: 'Struck by lightning',
-  debris: 'Hit by space junk',
+  lava: 'Fell into the lava',
+  bat: 'Bitten by a fire bat',
+  wisp: 'Burned by a fire wisp',
+  rockfall: 'Flattened by a rockfall',
   quit: 'You called it there',
 };
 
@@ -355,7 +354,14 @@ function handleEvents(): void {
     else if (e.t === 'stomp') sfx.stomp();
     else if (e.t === 'warn') sfx.warn();
     else if (e.t === 'strike') sfx.strike();
-    else if (e.t === 'die') sfx.die();
+    else if (e.t === 'pickup') {
+      sfx.pickup(e.kind === PickupKind.Shield);
+      toast(e.kind === PickupKind.Shield ? 'Shell: blocks one hit' : e.kind === PickupKind.Geyser ? 'Geyser!' : 'Lava bubble!');
+    } else if (e.t === 'rideend') sfx.rideEnd();
+    else if (e.t === 'shieldbreak') {
+      sfx.shieldBreak();
+      toast('Shell broken');
+    } else if (e.t === 'die') sfx.die(e.cause === 'lava');
   }
   sim.events.length = 0;
 }
@@ -370,7 +376,7 @@ function tick(): void {
       sim = new Sim(Math.floor(Math.random() * 2 ** 31));
       bot = new Bot(true);
       prev = { x: sim.x, y: sim.y };
-      renderer.snapCamera(sim.y);
+      renderer.snapCamera(sim.lavaY);
     }
     return;
   }
@@ -384,11 +390,11 @@ function tick(): void {
 }
 
 function updateHud(): void {
-  ui.height.textContent = fmt(sim.heightNow < 0 ? 0 : sim.heightNow);
+  ui.height.textContent = fmt(sim.meters);
   const now = sim.heightNow;
   const max = sim.meters;
   const bits: string[] = [];
-  if (max - now > 15) bits.push(`Max ${fmt(max)}`);
+  if (sim.shield) bits.push('Shell');
   if (localBest && !(max > localBest)) bits.push(`Best ${fmt(localBest)}`);
   if (!run) bits.push('Offline: not ranked');
   ui.sub.textContent = bits.join(' · ');

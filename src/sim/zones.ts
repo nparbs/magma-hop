@@ -25,7 +25,7 @@ export const ZONES: Zone[] = [
   {
     name: 'Magma Chamber', from: 0, sky: ['#2a0d12', '#5a1608'], rock: ['#3d1512', '#1c0a0c'],
     plat: ['#ffb02e', '#7a3b2a', '#3a1c1a'], decor: 'pillar', mote: 'ember', moteColor: '#ff9a3c',
-    intro: 'The lava is rising. Bounce up!',
+    intro: 'The lava is rising. Hop up!',
   },
   {
     name: 'Crystal Caves', from: 250, sky: ['#140f2e', '#2b1245'], rock: ['#2a1d52', '#120c26'],

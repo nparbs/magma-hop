@@ -6,7 +6,7 @@
 // -> git push -> run the locked deploy key on the VM -> wait for /health to report the new version.
 //
 // The VM address and key live in .deploy.local.json (git-ignored), e.g.
-//   { "host": "deb@<vm address>", "key": "~/.ssh/updraft-deploy", "url": "https://updraft.parbs.online" }
+//   { "host": "deb@<vm address>", "key": "~/.ssh/magmahop-deploy", "url": "https://magmahop.parbs.online" }
 
 import { execSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';

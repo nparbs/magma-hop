@@ -12,7 +12,7 @@ declare const __APP_VERSION__: string;
 
 const PORT = Number(process.env.PORT ?? 8794);
 const STATIC_DIR = path.resolve(process.env.STATIC_DIR ?? 'dist');
-const DB_FILE = process.env.DB_FILE ?? 'data/updraft.db';
+const DB_FILE = process.env.DB_FILE ?? 'data/magmahop.db';
 const ALLOWED = (process.env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 const IP_HEADER = (process.env.CLIENT_IP_HEADER ?? '').toLowerCase();
 
@@ -263,7 +263,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Updraft v${__APP_VERSION__} on :${PORT}, static from ${STATIC_DIR}, ${store.climbers()} climbers`);
+  console.log(`Magma Hop v${__APP_VERSION__} on :${PORT}, static from ${STATIC_DIR}, ${store.climbers()} climbers`);
 });
 
 for (const sig of ['SIGINT', 'SIGTERM'] as const) process.on(sig, () => server.close(() => process.exit(0)));

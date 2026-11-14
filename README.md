@@ -1,6 +1,8 @@
-# Updraft
+# Magma Hop
 
-Bounce out of an erupting volcano with the lava right behind you. You bounce on every ledge by yourself, and you only steer left and right. The edges wrap, the view only moves up, and the run ends if you drop into the lava or take one hit from a fire bat, a rockfall or a fire wisp. Geysers and lava bubbles carry you up the shaft, and a shell blocks one hit. Your score is the highest point you reach, and the global board keeps the best climbs.
+Play it at **https://magmahop.parbs.online**.
+
+Hop out of an erupting volcano with the lava right behind you. You bounce on every ledge by yourself, and you only steer left and right. The edges wrap, the view only moves up, and the run ends if you drop into the lava or take one hit from a fire bat, a rockfall or a fire wisp. Geysers and lava bubbles carry you up the shaft, and a shell blocks one hit. Your score is the highest point you reach, and the global board keeps the best climbs.
 
 There's also a Daily Climb (the same volcano for everyone each UTC day, with its own board, where your best try races you as a ghost), and any climb on a board can be watched back.
 

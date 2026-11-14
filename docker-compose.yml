@@ -1,16 +1,17 @@
 # See docs/hosting.md. Reuses Scrap Riot's Cloudflare Tunnel by joining its Docker network.
 services:
-  updraft:
+  magmahop:
     build: .
     restart: unless-stopped
     environment:
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://updraft.parbs.online}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://magmahop.parbs.online}
       CLIENT_IP_HEADER: ${CLIENT_IP_HEADER:-cf-connecting-ip}
+      DAILY_SECRET: ${DAILY_SECRET:-}
     # No published ports: only the tunnel can reach it, so the client IP header can be trusted.
     expose:
       - "8794"
     volumes:
-      - updraft_data:/data
+      - magmahop_data:/data
     networks:
       - tunnel
     read_only: true
@@ -22,7 +23,7 @@ services:
     pids_limit: 64
 
 volumes:
-  updraft_data:
+  magmahop_data:
 
 networks:
   tunnel:

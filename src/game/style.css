@@ -29,7 +29,7 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-canvas {
+#game {
   image-rendering: pixelated;
   position: fixed;
   inset: 0;
@@ -233,9 +233,24 @@ button {
   text-shadow: 0 4px 0 #7a3f12;
 }
 
-.logo span {
-  color: var(--hot2);
-  text-shadow: 0 4px 0 #7a120a;
+/* The logo is pixel art drawn by render.ts (Logo), blown up 4x with hard edges. */
+.logo-art {
+  display: block;
+  width: 256px;
+  max-width: 80%;
+  height: auto;
+  aspect-ratio: 64 / 50;
+  margin: -6px auto 0;
+  image-rendering: pixelated;
+}
+
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .tag {
@@ -533,8 +548,9 @@ body.calm .big-btn {
   .panel {
     padding: 14px 18px 10px;
   }
-  .logo {
-    font-size: 38px;
+  .logo-art {
+    width: 77px;
+    margin-top: -6px;
   }
   .tag {
     display: none;
@@ -568,7 +584,7 @@ body.calm .big-btn {
     font-size: 16px;
   }
   .big-btn {
-    padding: 10px;
+    padding: 6px;
     font-size: 26px;
     margin-bottom: 10px;
   }

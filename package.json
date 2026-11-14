@@ -1,5 +1,5 @@
 {
-  "name": "updraft",
+  "name": "magma-hop",
   "private": true,
   "version": "0.3.0",
   "description": "An endless bouncing climb out of a volcano, with a global height board.",

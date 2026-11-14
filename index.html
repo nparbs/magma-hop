@@ -4,9 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
     <meta name="theme-color" content="#1a0808" />
-    <meta name="description" content="Bounce up an erupting volcano with the lava right behind you. Steer left and right, never fall, and climb the height board." />
-    <title>Updraft</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' fill='%231a0808'/%3E%3Crect x='7' y='1' width='2' height='2' fill='%23ff7a1e'/%3E%3Crect x='4' y='3' width='8' height='8' fill='%23ffc23a'/%3E%3Crect x='3' y='5' width='10' height='4' fill='%23ffc23a'/%3E%3Crect x='4' y='9' width='8' height='2' fill='%23ff7a1e'/%3E%3Crect x='5' y='5' width='2' height='3' fill='%23fff'/%3E%3Crect x='9' y='5' width='2' height='3' fill='%23fff'/%3E%3Crect x='6' y='6' width='1' height='2' fill='%232a0d12'/%3E%3Crect x='10' y='6' width='1' height='2' fill='%232a0d12'/%3E%3Crect y='13' width='16' height='3' fill='%23f0541a'/%3E%3Crect y='13' width='16' height='1' fill='%23ffe066'/%3E%3C/svg%3E" />
+    <meta name="description" content="Hop up an erupting volcano with the lava right behind you. Steer left and right, never fall, and climb the height board. A new Daily Climb every day." />
+    <meta property="og:title" content="Magma Hop" />
+    <meta property="og:description" content="Hop up an erupting volcano with the lava right behind you. A free browser game with a global height board." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://magmahop.parbs.online/" />
+    <title>Magma Hop</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' fill='%231a0808'/%3E%3Crect x='1' y='11' width='1' height='1' fill='%23b3260f'/%3E%3Crect x='2' y='9' width='1' height='1' fill='%23f0541a'/%3E%3Crect x='4' y='7' width='1' height='1' fill='%23ff9a1e'/%3E%3Crect x='10' y='0' width='1' height='2' fill='%23ff7a1e'/%3E%3Crect x='9' y='1' width='2' height='1' fill='%23ffc23a'/%3E%3Crect x='7' y='2' width='6' height='7' fill='%23ffc23a'/%3E%3Crect x='6' y='3' width='8' height='5' fill='%23ffc23a'/%3E%3Crect x='7' y='8' width='6' height='1' fill='%23ff7a1e'/%3E%3Crect x='6' y='7' width='1' height='1' fill='%23ff7a1e'/%3E%3Crect x='13' y='7' width='1' height='1' fill='%23ff7a1e'/%3E%3Crect x='8' y='3' width='1' height='1' fill='%23fff6c8'/%3E%3Crect x='9' y='4' width='1' height='2' fill='%232a0d12'/%3E%3Crect x='11' y='4' width='1' height='2' fill='%232a0d12'/%3E%3Crect y='13' width='16' height='3' fill='%23f0541a'/%3E%3Crect y='15' width='16' height='1' fill='%23b3260f'/%3E%3Crect y='13' width='16' height='1' fill='%23ffe066'/%3E%3Crect x='3' y='12' width='1' height='1' fill='%23ffe066'/%3E%3Crect x='8' y='12' width='3' height='1' fill='%23ff9a1e'/%3E%3C/svg%3E" />
   </head>
   <body>
     <canvas id="game"></canvas>
@@ -30,8 +34,8 @@
 
     <section id="title" class="panel-wrap">
       <div class="panel title-panel">
-        <h1 class="logo">UP<span>DRAFT</span></h1>
-        <p class="tag">The volcano is waking up. Bounce out ahead of the lava.</p>
+        <h1 class="logo"><canvas id="logoArt" class="logo-art" aria-hidden="true"></canvas><span class="sr">Magma Hop</span></h1>
+        <p class="tag">The volcano is waking up. Hop out ahead of the lava.</p>
         <label class="name-row">
           <span>Your name on the board</span>
           <input id="nameInput" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Name for the board" />
@@ -57,7 +61,7 @@
       <div class="panel">
         <h2>How to play</h2>
         <ul class="how">
-          <li><b>You bounce by yourself.</b> Land on a ledge and you spring up again.</li>
+          <li><b>You hop by yourself.</b> Land on a ledge and you spring up again.</li>
           <li><b>Steer left and right:</b> ← → or A / D, a gamepad, or hold the left or right half of the screen. Phones can use tilt too.</li>
           <li><b>The edges wrap.</b> Go off one side and you come back on the other.</li>
           <li><b>Don't fall.</b> The view only moves up and the lava follows it. Drop off the bottom and the run is over. Your score is the highest point you reached.</li>

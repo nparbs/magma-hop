@@ -5,7 +5,7 @@ import { Kind, PickupKind, Recorder, Sim, TICK_RATE, UNITS_PER_METER } from '../
 import { Bot } from '../sim/bot';
 import { ZONES, zoneIndexAt } from '../sim/zones';
 import { cleanName } from '../sim/names';
-import { Renderer, type Marker } from './render';
+import { Logo, Renderer, type Marker } from './render';
 import { Input } from './input';
 import { Sfx } from './audio';
 import { Playback } from './playback';
@@ -21,14 +21,14 @@ const STEP = 1 / TICK_RATE;
 const store = {
   get(k: string): string | null {
     try {
-      return localStorage.getItem('updraft.' + k);
+      return localStorage.getItem('magmahop.' + k);
     } catch {
       return null;
     }
   },
   set(k: string, v: string): void {
     try {
-      localStorage.setItem('updraft.' + k, v);
+      localStorage.setItem('magmahop.' + k, v);
     } catch {
       /* fine */
     }
@@ -102,6 +102,7 @@ const ui = {
 $('ver').textContent = `v${__APP_VERSION__}`;
 
 const renderer = new Renderer(canvas);
+const logo = new Logo($<HTMLCanvasElement>('logoArt'));
 const input = new Input(canvas);
 const sfx = new Sfx();
 window.addEventListener('resize', () => renderer.resize());
@@ -651,13 +652,15 @@ function frame(now: number): void {
   } else renderer.ghost = null;
 
   renderer.draw(sim, alpha, prev, markers(), mode === 'pause' ? 0 : dt);
+  // Calm effects keep Pip still on the logo.
+  if (mode === 'title') logo.draw(calm ? 0.3 : now / 1000);
   music();
   if (input.padConfirm() && (mode === 'title' || mode === 'over')) void startGame(mode === 'title' ? 'endless' : lastKind);
   requestAnimationFrame(frame);
 }
 
 // Headless checks poke at this.
-(window as unknown as { updraft: unknown }).updraft = {
+(window as unknown as { magmahop: unknown }).magmahop = {
   get sim() {
     return sim;
   },

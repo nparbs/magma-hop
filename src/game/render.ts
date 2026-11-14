@@ -163,6 +163,146 @@ const SHELL = sprite(
 
 const LAVA = ['#ffe066', '#ff9a1e', '#f0541a', '#b3260f', '#7a120a'];
 
+// ---------- The title logo: MAGMA over HOP, with Pip as the O ----------
+
+/** 5x7 letters, only the ones the logo needs. `#` is lit. */
+const GLYPHS: Record<string, string[]> = {
+  M: ['#...#', '##.##', '#.#.#', '#.#.#', '#...#', '#...#', '#...#'],
+  A: ['.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+  G: ['.###.', '#...#', '#....', '#.###', '#...#', '#...#', '.###.'],
+  H: ['#...#', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+  P: ['####.', '#...#', '#...#', '####.', '#....', '#....', '#....'],
+};
+
+/** Logo size in art pixels. */
+const LOGO_W = 64;
+const LOGO_H = 50;
+const BIG = 3;
+const SMALL = 2;
+/** Where each word starts and how big its letter pixels are. HOP's O is left blank for Pip. */
+const WORDS = [
+  { text: 'MAGMA', x: 3, y: 3, s: SMALL },
+  { text: 'H P', x: 6, y: 21, s: BIG },
+];
+/** Columns under HOP where lava drips: the feet of the H, the P, and Pip's puddle. */
+const DRIPS = [7, 19, 43, 31];
+
+/**
+ * Draws the logo into its own small canvas, a frame at a time (Pip keeps hopping).
+ * The canvas is shown blown up with `image-rendering: pixelated`.
+ */
+export class Logo {
+  private g: CanvasRenderingContext2D;
+  /** Letter pixels, and the dark outline around them, worked out once. */
+  private fill: Uint8Array;
+  private edge: Uint8Array;
+
+  constructor(readonly canvas: HTMLCanvasElement) {
+    canvas.width = LOGO_W;
+    canvas.height = LOGO_H;
+    this.g = canvas.getContext('2d')!;
+    this.fill = new Uint8Array(LOGO_W * LOGO_H);
+    this.edge = new Uint8Array(LOGO_W * LOGO_H);
+    for (const w of WORDS) {
+      [...w.text].forEach((ch, i) => {
+        const rows = GLYPHS[ch];
+        if (!rows) return;
+        const gx = w.x + i * 6 * w.s;
+        rows.forEach((row, ry) => {
+          for (let rx = 0; rx < 5; rx++) {
+            if (row[rx] !== '#') continue;
+            for (let dy = 0; dy < w.s; dy++) for (let dx = 0; dx < w.s; dx++) this.fill[(w.y + ry * w.s + dy) * LOGO_W + gx + rx * w.s + dx] = 1;
+          }
+        });
+      });
+    }
+    for (let y = 0; y < LOGO_H; y++) {
+      for (let x = 0; x < LOGO_W; x++) {
+        if (this.fill[y * LOGO_W + x]) continue;
+        let near = false;
+        for (let dy = -1; dy <= 1 && !near; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx >= 0 && ny >= 0 && nx < LOGO_W && ny < LOGO_H && this.fill[ny * LOGO_W + nx]) near = true;
+          }
+        }
+        if (near) this.edge[y * LOGO_W + x] = 1;
+      }
+    }
+  }
+
+  draw(time: number): void {
+    const { g } = this;
+    g.clearRect(0, 0, LOGO_W, LOGO_H);
+    const px = (x: number, y: number, w: number, h: number, c: string) => {
+      g.fillStyle = c;
+      g.fillRect(x, y, w, h);
+    };
+
+    // Lava drips hang from HOP and stretch, drop and start again.
+    for (let i = 0; i < DRIPS.length; i++) {
+      const ph = (time * (0.35 + 0.1 * i) + i * 0.37) % 1;
+      const x = DRIPS[i];
+      const top = WORDS[1].y + 7 * BIG;
+      const len = Math.floor(ph * 7);
+      px(x, top, 1, 1 + len, LAVA[2]);
+      px(x, top + len, 1, 1, LAVA[1]);
+      if (ph > 0.75) px(x, top + 9 + Math.floor((ph - 0.75) * 30), 1, 1, LAVA[1]);
+    }
+
+    // A drop shadow, the outline, then the letters in bands from hot yellow to deep red.
+    for (let y = 0; y < LOGO_H; y++) {
+      for (let x = 0; x < LOGO_W; x++) {
+        const k = y * LOGO_W + x;
+        if ((this.fill[k] || this.edge[k]) && y + 2 < LOGO_H && !this.fill[k + 2 * LOGO_W] && !this.edge[k + 2 * LOGO_W]) {
+          px(x, y + 2, 1, 1, '#3a0a08');
+        }
+      }
+    }
+    for (const w of WORDS) {
+      const h = 7 * w.s;
+      for (let y = w.y - 1; y <= w.y + h; y++) {
+        const t = (y - w.y) / (h - 1);
+        const band = t < 0.2 ? LAVA[0] : t < 0.45 ? LAVA[1] : t < 0.75 ? LAVA[2] : LAVA[3];
+        for (let x = 0; x < LOGO_W; x++) {
+          const k = y * LOGO_W + x;
+          if (this.edge[k]) px(x, y, 1, 1, '#2a0d12');
+          else if (this.fill[k]) px(x, y, 1, 1, band);
+        }
+      }
+      // A hot glint along the top of each letter.
+      for (let x = 0; x < LOGO_W; x++) if (this.fill[w.y * LOGO_W + x] && (x + w.y) % 5 !== 0) px(x, w.y, 1, 1, '#fff6c8');
+    }
+
+    // Pip is the O: hopping off a little lava puddle in the O's spot.
+    const ox = WORDS[1].x + 6 * BIG + 1;
+    const floor = WORDS[1].y + 7 * BIG - 1;
+    px(ox - 1, floor, 15, 1, LAVA[1]);
+    px(ox, floor + 1, 13, 1, LAVA[2]);
+    const ph = (time * 1.6) % 1;
+    const air = 4 * ph * (1 - ph);
+    const lift = Math.round(air * 10);
+    const squash = ph < 0.08 || ph > 0.94;
+    const top = floor - 11 - lift + (squash ? 1 : 0);
+    g.drawImage(EMBER, ox, top, 13, squash ? 10 : 11);
+    // Eyes, looking up on the way up.
+    for (const e of [3, 8]) {
+      px(ox + e, top + 4, 2, 3, '#ffffff');
+      px(ox + e + 1, top + 4 + (ph < 0.5 ? 0 : 1), 1, 2, '#2a0d12');
+    }
+    // Flame hair that flickers.
+    const fl = Math.floor(time * 12) % 2;
+    px(ox + 5, top - 1, 3, 1, EMBER_PAL.y);
+    px(ox + 6 - fl, top - 2, 2, 1, EMBER_PAL.y);
+    px(ox + 6 + fl, top - 3, 1, 1, EMBER_PAL.r);
+    if (squash) {
+      px(ox - 3, floor - 1, 2, 1, LAVA[0]);
+      px(ox + 14, floor - 1, 2, 1, LAVA[0]);
+    }
+  }
+}
+
 export class Renderer {
   readonly ctx: CanvasRenderingContext2D;
   /** Screen size in device pixels. */

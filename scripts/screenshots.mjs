@@ -1,6 +1,6 @@
 // Drive the game in headless Chrome and save screenshots to ./shots.
 // Usage: node scripts/screenshots.mjs [scenario...]   (needs `npm run dev`; URL=... to override)
-// Scenarios: desktop, phone, landscape, zones. window.updraft exposes sim, mode, renderer, startGame.
+// Scenarios: desktop, phone, landscape, zones. window.magmahop exposes sim, mode, renderer, startGame.
 import { chromium } from 'playwright-core';
 import fs from 'node:fs';
 
@@ -33,7 +33,7 @@ const shot = async (page, name) => {
 /** Teleport the climber to a height (meters) to look at a zone. Only for screenshots. */
 async function warp(page, meters) {
   await page.evaluate((m) => {
-    const u = window.updraft;
+    const u = window.magmahop;
     const s = u.sim;
     s.generateUntil(m * 10 + 3000);
     const p = s.platforms.filter((p) => p.path && p.y >= m * 10).sort((a, b) => a.y - b.y)[0];
@@ -84,11 +84,11 @@ if (want('zones')) {
 
 /** End the run from the pause menu, or wait out the death if it already ended. */
 async function endIfPlaying(page) {
-  if ((await page.evaluate(() => window.updraft.mode)) === 'play') {
+  if ((await page.evaluate(() => window.magmahop.mode)) === 'play') {
     await page.keyboard.press('Escape');
     await page.click('#endBtn');
   }
-  await page.waitForFunction(() => window.updraft.mode === 'over', null, { timeout: 5000 });
+  await page.waitForFunction(() => window.magmahop.mode === 'over', null, { timeout: 5000 });
 }
 
 if (want('daily')) {
@@ -108,7 +108,7 @@ if (want('daily')) {
   await shot(page, 'd1-daily-over');
   await page.click('#againBtn');
   await wait(page, 2500);
-  const g = await page.evaluate(() => ({ ghost: !!window.updraft.ghost, mode: window.updraft.mode }));
+  const g = await page.evaluate(() => ({ ghost: !!window.magmahop.ghost, mode: window.magmahop.mode }));
   console.log('second daily try:', JSON.stringify(g));
   await shot(page, 'd2-daily-ghost');
   await endIfPlaying(page);

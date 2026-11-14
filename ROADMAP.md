@@ -1,6 +1,6 @@
-# Updraft roadmap
+# Magma Hop roadmap
 
-An endless bouncing climb with a global board for the highest climb. Browser and phones, to be hosted at updraft.parbs.online.
+An endless hop up an erupting volcano, with a global board for the highest climb. Browser and phones, at magmahop.parbs.online. It was called Updraft until 2026-11-14.
 
 ## Decisions so far
 
@@ -18,7 +18,9 @@ These came from the owner's answers on 2026-11-13, corrected on 2026-11-14. Chan
 | Board | Global, best height per climber, all time and this week. Server-issued seeds and a full server-side replay of every run. |
 | Theme and art style | Volcano escape in chunky pixel art (option B below). The owner picked it on 2026-11-14. |
 | Enemies | Collision only: stomp from above, touching them any other way is a hit. **No shooting** (owner, 2026-11-14). |
-| Hosting | updraft.parbs.online, same pattern as the other parbs.online games. |
+| Name | **Magma Hop**, picked by the owner on 2026-11-14 from Claude's list (it replaced Updraft, which suited the old sky tower). |
+| Repo | Public, github.com/nparbs/magma-hop (owner, 2026-11-14). |
+| Hosting | magmahop.parbs.online, same pattern as the other parbs.online games. |
 
 ## v0.1 — first climb (built)
 
@@ -78,7 +80,7 @@ All of these can be drawn in code. Each one says what is below you, because fall
 | E | **Out of the deep** | Dark water, glowing sea life, light growing as you rise | A small glowing jellyfish, pulsing instead of bouncing | Trench → Shipwreck → Kelp forest → Reef → Sunlit shallows → Open sky | Anglerfish, urchins, currents. Rides: bubble column, a turtle | The dark |
 | F | **Laundry day** | Flat cartoon cutouts, washed-out city colors | A lost sock | Alley → Fire escapes → Rooftops → Billboards → Cranes → Flight path | Pigeons, cats swatting from windows, AC exhaust gusts. Rides: a shopping bag in the wind, a drone delivery | The alley dumpster |
 
-Claude's pick is **B, Volcano escape**: the rising lava explains the new falling rule at a glance, the name "Updraft" still fits (hot air up a shaft), and pixel art on a dark background reads well at 640x360. C is the cheapest to build and pairs best with the planned music. E would want a new name.
+Claude's pick is **B, Volcano escape**: the rising lava explains the new falling rule at a glance, and pixel art on a dark background reads well at 640x360. C is the cheapest to build and pairs best with the planned music. E would want a new name.
 
 ## Before going live
 
@@ -86,7 +88,7 @@ Claude's pick is **B, Volcano escape**: the rising lava explains the new falling
 - [ ] Owner listen of the v0.3 music (nobody has heard it yet; the loops are in `src/game/audio.ts`, `SONGS`).
 - [ ] Merge `v0.2-bouncer` and `v0.3` once the owner is happy with them.
 - [ ] VM setup and the Cloudflare hostname (docs/hosting.md).
-- [ ] Add Updraft to the parbs.online landing page.
+- [ ] Add Magma Hop to the parbs.online landing page.
 
 ## v0.3 — feel and fairness (built, on branch `v0.3`)
 

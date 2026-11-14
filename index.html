@@ -32,6 +32,19 @@
       <div id="touchHint" class="touch-hint hidden"><span>◀ hold</span><span>hold ▶</span></div>
     </div>
 
+    <div id="laury" class="laury">
+      <canvas id="lauryArt" aria-hidden="true"></canvas>
+      <div class="laury-bubble">
+        <b>Laury</b>
+        <span id="lauryText" aria-hidden="true"></span>
+        <span id="laurySr" class="sr" aria-live="polite"></span>
+        <div class="laury-btns">
+          <button id="lauryNext" class="chip">Next ▶</button>
+          <button id="laurySkip" class="chip">Skip</button>
+        </div>
+      </div>
+    </div>
+
     <section id="title" class="panel-wrap">
       <div class="panel title-panel">
         <div class="logo-row">
@@ -58,6 +71,7 @@
           <button id="calmBtn" class="chip">Calm effects off</button>
           <button id="tiltBtn" class="chip hidden">Tilt off</button>
           <button id="liveBtn" class="chip">Others on</button>
+          <button id="lauryBtn" class="chip">Laury on</button>
         </div>
         <div id="miniBoard" class="mini-board"></div>
         <div id="ver" class="ver"></div>
@@ -79,6 +93,7 @@
           <li><b>Daily Climb:</b> everyone gets the same volcano for the day (it changes at 00:00 UTC), with its own board. Your best try today races you as a blue ghost.</li>
           <li><b>Climb with others:</b> anyone playing the same mode as you at the same time shows up live. In the Daily Climb you share the volcano, so you see them hopping beside you. In endless runs everyone has their own volcano, so you see a notch on the wall at their height. An arrow at the top or bottom points to anyone out of view. <b>Others off</b> hides them and hides you from them.</li>
           <li><b>Watch the best:</b> press ▶ next to a name on the board to watch that climb.</li>
+          <li><b>Laury</b> shows you around the first time you try each mode, then pops in with a joke now and then. <b>Laury off</b> sends her home. <button id="lauryAgain" class="chip">Show her tutorial again</button></li>
           <li><b>Calm effects</b> turns off screen flashes, shaking and blinking warnings.</li>
         </ul>
         <button class="btn close">Got it</button>
@@ -107,6 +122,7 @@
         <div class="row small pause-chips">
           <button id="pauseTilt" class="chip hidden">Tilt off</button>
           <button id="pauseLive" class="chip">Others on</button>
+          <button id="pauseLaury" class="chip">Laury on</button>
         </div>
       </div>
     </section>

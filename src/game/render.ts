@@ -264,6 +264,97 @@ const DRIPS = [7, 19, 43, 31];
  * Draws the logo into its own small canvas, a frame at a time (Pip keeps hopping).
  * The canvas is shown blown up with `image-rendering: pixelated`.
  */
+/** Laury, the volcanologist who shows you the ropes: brown ponytail, goggles up, heat jacket. */
+const LAURY = sprite(
+  [
+    '......oooooo......',
+    '....oohhHHhhoo....',
+    '...ohhHHhhhhhho...',
+    '..ohGGGGGGGGGGho..',
+    '..oGggwGGGggwGGo..',
+    '..ohGGGGGGGGGGhoo.',
+    '..ohhssssssshhhddo',
+    '..ohssssssssshhddo',
+    '..ohssssssssshoddo',
+    '..ohssssssssshoddo',
+    '..ohSssssssSshoddo',
+    '...oSsssssssso.ddo',
+    '....ossssssoo..do.',
+    '...ookkkkkkoo..o..',
+    '..ojjjkkkkjjjo....',
+    '.ojjjjjkkjjjjjo...',
+    '.ojJjjjkkjjjJjo...',
+    '.osJjjjkkjjjJso...',
+    '.osoJjjjjjjJoso...',
+    '..o.oJJJJJJo.o....',
+    '....oppppppo......',
+    '....opppoppo......',
+    '....opppoppo......',
+    '...obbbooobbbo....',
+    '...oooo...oooo....',
+  ],
+  {
+    o: '#2a1418', h: '#7a4526', H: '#a8693a', d: '#5a321b',
+    s: '#f2c29a', S: '#e0a07c', G: '#3a3a4a', g: '#6fd0ff', w: '#ffffff',
+    j: '#ff9a3c', J: '#c4561e', k: '#fff0a0', p: '#4a3a5a', b: '#3a2420',
+  },
+);
+export const LAURY_W = 22;
+export const LAURY_H = 28;
+
+/** Draws Laury into her own little canvas (the page scales it up). Blinks, talks and waves. */
+export class LauryArt {
+  private g: CanvasRenderingContext2D;
+  constructor(readonly canvas: HTMLCanvasElement) {
+    canvas.width = LAURY_W;
+    canvas.height = LAURY_H;
+    this.g = canvas.getContext('2d')!;
+  }
+
+  /** `talking`: mouth moves; `wave`: right hand up; `still`: no bobbing (calm effects). */
+  draw(time: number, talking: boolean, wave: boolean, still: boolean): void {
+    const { g } = this;
+    const px = (x: number, y: number, w: number, h: number, c: string) => {
+      g.fillStyle = c;
+      g.fillRect(x, y, w, h);
+    };
+    g.clearRect(0, 0, LAURY_W, LAURY_H);
+    const ox = 1;
+    const oy = 2 + (!still && Math.floor(time * 2.5) % 2 ? 1 : 0);
+    g.drawImage(LAURY, ox, oy);
+    // Eyes, with a blink every few seconds.
+    const blink = time % 3.4 < 0.12;
+    for (const ex of [6, 10]) {
+      if (blink) px(ox + ex, oy + 9, 1, 1, '#2a1418');
+      else {
+        px(ox + ex, oy + 8, 1, 2, '#2a1418');
+        px(ox + ex, oy + 8, 1, 1, '#4a2a20');
+      }
+    }
+    // Mouth: a smile, or flapping while she talks.
+    const open = talking && Math.floor(time * 9) % 2 === 0;
+    if (open) {
+      px(ox + 8, oy + 11, 2, 2, '#b0443a');
+      px(ox + 8, oy + 12, 2, 1, '#e86a5a');
+    } else {
+      px(ox + 7, oy + 11, 1, 1, '#b0443a');
+      px(ox + 8, oy + 12, 2, 1, '#b0443a');
+      px(ox + 10, oy + 11, 1, 1, '#b0443a');
+    }
+    if (wave) {
+      // Lower hand tucked away, the arm raised and waving beside her head.
+      px(ox + 13, oy + 17, 1, 2, '#ff9a3c');
+      const sway = Math.floor(time * 6) % 2;
+      px(ox + 14, oy + 14, 2, 2, '#2a1418');
+      px(ox + 14, oy + 14, 1, 1, '#ff9a3c');
+      px(ox + 15 + sway, oy + 11, 2, 3, '#2a1418');
+      px(ox + 15 + sway, oy + 12, 1, 2, '#ff9a3c');
+      px(ox + 16 + sway, oy + 9, 2, 3, '#2a1418');
+      px(ox + 16 + sway, oy + 10, 1, 1, '#f2c29a');
+    }
+  }
+}
+
 export class Logo {
   /** The climber in the O: whichever skin is picked. */
   skin: Skin = SKINS[0];
@@ -441,6 +532,11 @@ export class Renderer {
     this.buf.width = this.bw;
     this.buf.height = this.bh;
     this.ox = Math.floor((this.bw - COL) / 2);
+  }
+
+  /** Width of the space beside the shaft, in CSS pixels. */
+  get gutter(): number {
+    return (this.ox * this.px * window.innerWidth) / this.w;
   }
 
   /** Jump the view straight to where the lava is (new run, teleport). */

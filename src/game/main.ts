@@ -5,12 +5,14 @@ import { Kind, PickupKind, Recorder, Sim, TICK_RATE, UNITS_PER_METER } from '../
 import { Bot } from '../sim/bot';
 import { ZONES, zoneIndexAt } from '../sim/zones';
 import { cleanName } from '../sim/names';
-import { Logo, Renderer, SKINS, skinAt, type Marker } from './render';
+import { LauryArt, Logo, Renderer, SKINS, skinAt, type Marker } from './render';
 import { Input } from './input';
 import { Sfx } from './audio';
 import { Playback } from './playback';
 import { fetchBoard, fetchRun, finishRun, startRun, type Board, type Range } from './net';
 import { LiveClimbers, liveCounts } from './live';
+import { Laury } from './laury';
+import { AFTER, CHECK_IN, DAILY_START, MILESTONE, START, basicsTour, dailyTour, pick } from './laury-lines';
 
 declare const __APP_VERSION__: string;
 
@@ -111,14 +113,24 @@ const renderer = new Renderer(canvas);
 const logo = new Logo($<HTMLCanvasElement>('logoArt'));
 const input = new Input(canvas);
 const sfx = new Sfx();
-window.addEventListener('resize', () => renderer.resize());
+/** Laury and her bubble stay beside the shaft when there's room for them there. */
+function fitLaury(): void {
+  const room = renderer.gutter - 20;
+  document.documentElement.style.setProperty('--laury-max', room >= 300 ? `${Math.min(500, room)}px` : 'min(500px, calc(100vw - 20px))');
+}
+fitLaury();
+window.addEventListener('resize', () => {
+  renderer.resize();
+  fitLaury();
+});
 // Any first tap or key wakes the audio up, so the title music can start.
 window.addEventListener('pointerdown', () => sfx.unlock());
 window.addEventListener('keydown', () => sfx.unlock());
 
 // ---------- State ----------
 
-type Mode = 'title' | 'play' | 'pause' | 'dying' | 'over' | 'watch';
+/** `intro`: a run that waits while Laury gives the first-time tutorial. */
+type Mode = 'title' | 'intro' | 'play' | 'pause' | 'dying' | 'over' | 'watch';
 type RunTicket = { runId: string; seed: number; got: number; day: string | null };
 let mode: Mode = 'title';
 let sim = new Sim(Math.floor(Math.random() * 2 ** 31));
@@ -260,6 +272,60 @@ setInterval(() => {
   if (mode === 'title' && !document.hidden) void refreshLiveNote();
 }, 10_000);
 
+// Laury: a first-time tutorial per mode, a joke at the start of later runs, check-ins every 500 m.
+const laury = new Laury(
+  $('laury'),
+  new LauryArt($<HTMLCanvasElement>('lauryArt')),
+  $('lauryText'),
+  $('laurySr'),
+  $<HTMLButtonElement>('lauryNext'),
+  $<HTMLButtonElement>('laurySkip'),
+);
+let lauryOn = store.get('laury') !== '0';
+const lauryLabel = () => {
+  for (const id of ['lauryBtn', 'pauseLaury']) $(id).textContent = lauryOn ? 'Laury on' : 'Laury off';
+};
+lauryLabel();
+for (const id of ['lauryBtn', 'pauseLaury']) {
+  $(id).addEventListener('click', () => {
+    lauryOn = !lauryOn;
+    store.set('laury', lauryOn ? '1' : '0');
+    lauryLabel();
+    sfx.click();
+    if (!lauryOn) laury.finish();
+  });
+}
+$('lauryAgain').addEventListener('click', (e) => {
+  store.set('seen.basics', '0');
+  store.set('seen.daily', '0');
+  lauryOn = true;
+  store.set('laury', '1');
+  lauryLabel();
+  (e.target as HTMLElement).textContent = "She'll be there next run";
+  sfx.click();
+});
+let lauryRecent: string[] = [];
+try {
+  lauryRecent = JSON.parse(store.get('lauryRecent') ?? '[]');
+  if (!Array.isArray(lauryRecent)) lauryRecent = [];
+} catch {
+  /* start fresh */
+}
+/** A line she hasn't said lately. */
+function lauryPick(list: string[]): string {
+  const l = pick(list, lauryRecent);
+  lauryRecent = [l, ...lauryRecent.filter((x) => x !== l)].slice(0, 12);
+  store.set('lauryRecent', JSON.stringify(lauryRecent));
+  return l;
+}
+function startLine(kind: 'endless' | 'daily'): string {
+  const after = AFTER[store.get('lastCause') ?? ''];
+  if (after && Math.random() < 0.35) return lauryPick(after);
+  return lauryPick(kind === 'daily' ? [...DAILY_START, ...START] : START);
+}
+/** The next 500 m mark where she might check in. */
+let nextCheckIn = 500;
+
 // ---------- Runs and the board ----------
 
 const ticket = (daily: boolean) => startRun(daily).then((r) => ({ ...r, got: Date.now() }));
@@ -341,11 +407,11 @@ for (const c of document.querySelectorAll<HTMLElement>('.close')) {
 function show(m: Mode): void {
   mode = m;
   ui.title.classList.toggle('hidden', m !== 'title');
-  ui.hud.classList.toggle('hidden', m !== 'play' && m !== 'dying' && m !== 'pause' && m !== 'watch');
+  ui.hud.classList.toggle('hidden', m !== 'play' && m !== 'dying' && m !== 'pause' && m !== 'watch' && m !== 'intro');
   ui.pause.classList.toggle('hidden', m !== 'pause');
   ui.over.classList.toggle('hidden', m !== 'over');
   ui.watchBar.classList.toggle('hidden', m !== 'watch');
-  ui.pauseBtn.classList.toggle('hidden', m === 'watch');
+  ui.pauseBtn.classList.toggle('hidden', m === 'watch' || m === 'intro');
   if (m !== 'title') ui.how.classList.add('hidden');
 }
 
@@ -356,6 +422,7 @@ function toTitle(): void {
   ghost = null;
   daily = null;
   live.leave();
+  laury.finish();
   prev = { x: sim.x, y: sim.y };
   renderer.snapCamera(sim.lavaY);
   ui.board.classList.add('hidden');
@@ -373,6 +440,8 @@ function resetWorld(seed: number): void {
   watch = null;
   ghost = null;
   live.leave();
+  laury.finish();
+  nextCheckIn = 500;
   rec = new Recorder();
   prev = { x: sim.x, y: sim.y };
   renderer.snapCamera(sim.lavaY);
@@ -411,17 +480,42 @@ async function startGame(kind: 'endless' | 'daily' = lastKind): Promise<void> {
   if (liveOn && r) live.begin(r.runId);
   const best = daily ? dailyBest(daily) : localBest;
   bestAnnounced = best === 0;
-  show('play');
   input.reset();
   const touch = matchMedia('(pointer: coarse)').matches;
-  if (daily) banner('Daily Climb', `Same volcano for everyone today · ${daily}`);
-  else banner(ZONES[0].name, touch ? 'Hold either side of the screen to steer' : 'Steer with ← → and stay ahead of the lava');
-  if (touch) {
-    ui.touchHint.classList.remove('hidden');
-    ui.touchHint.style.animation = 'none';
-    void ui.touchHint.offsetWidth;
-    ui.touchHint.style.animation = '';
-  }
+  const kickoff = (quip: boolean) => {
+    show('play');
+    if (daily) banner('Daily Climb', `Same volcano for everyone today · ${daily}`);
+    else banner(ZONES[0].name, touch ? 'Hold either side of the screen to steer' : 'Steer with ← → and stay ahead of the lava');
+    if (touch) {
+      ui.touchHint.classList.remove('hidden');
+      ui.touchHint.style.animation = 'none';
+      void ui.touchHint.offsetWidth;
+      ui.touchHint.style.animation = '';
+    }
+    if (quip && lauryOn) {
+      const forSim = sim;
+      window.setTimeout(() => {
+        if (sim === forSim && mode === 'play' && lauryOn) laury.say(startLine(kind));
+      }, 500);
+    }
+  };
+  // First time in this mode: Laury shows you around while the run waits.
+  const tour: string[] = [];
+  if (lauryOn && store.get('seen.basics') !== '1') tour.push(...basicsTour(touch));
+  if (lauryOn && kind === 'daily' && store.get('seen.daily') !== '1') tour.push(...dailyTour(liveOn));
+  if (tour.length) {
+    const forSim = sim;
+    show('intro');
+    void laury.tour(tour).then(() => {
+      store.set('seen.basics', '1');
+      if (kind === 'daily') store.set('seen.daily', '1');
+      if (sim !== forSim || mode !== 'intro') return;
+      last = performance.now();
+      acc = 0;
+      input.reset();
+      kickoff(false);
+    });
+  } else kickoff(true);
   if (daily) void loadGhost(daily);
   if (!nextRun) prefetchRun();
 }
@@ -513,8 +607,12 @@ function resume(): void {
   input.reset();
   show('play');
 }
-input.onPause = () => (mode === 'play' ? pause() : mode === 'pause' ? resume() : mode === 'watch' ? stopWatching() : undefined);
+input.onPause = () => (mode === 'intro' ? laury.finish() : mode === 'play' ? pause() : mode === 'pause' ? resume() : mode === 'watch' ? stopWatching() : undefined);
 ui.pauseBtn.addEventListener('click', pause);
+// During the tutorial a tap anywhere moves her along.
+canvas.addEventListener('pointerdown', () => {
+  if (mode === 'intro') laury.next();
+});
 $('resumeBtn').addEventListener('click', resume);
 $('endBtn').addEventListener('click', () => endRun('quit'));
 document.addEventListener('visibilitychange', () => {
@@ -550,6 +648,8 @@ function endRun(cause: string): void {
   ui.again.textContent = day ? 'Try today’s again' : 'Climb again';
   ghost = null;
   live.leave();
+  laury.finish();
+  store.set('lastCause', cause);
   show('over');
   if (isBest) sfx.best();
 
@@ -578,6 +678,11 @@ $('howBtn').addEventListener('click', () => ui.how.classList.remove('hidden'));
 window.addEventListener('keydown', (e) => {
   if ((e.target as HTMLElement)?.tagName === 'INPUT') {
     if (e.code === 'Enter') void startGame('endless');
+    return;
+  }
+  if ((e.code === 'Enter' || e.code === 'Space') && mode === 'intro') {
+    e.preventDefault();
+    if (!e.repeat) laury.next();
     return;
   }
   if ((e.code === 'Enter' || e.code === 'Space') && (mode === 'title' || mode === 'over')) {
@@ -669,6 +774,16 @@ function updateHud(): void {
   ui.wind.classList.toggle('hidden', g === 0);
   if (g) ui.wind.textContent = g > 0 ? 'Gust ≫' : '≪ Gust';
 
+  // Laury checks in at 500 m marks: always at the first two, then now and then.
+  if (mode === 'play' && max >= nextCheckIn) {
+    let mark = 0;
+    while (max >= nextCheckIn) {
+      mark = nextCheckIn;
+      nextCheckIn += 500;
+    }
+    if (lauryOn && (mark <= 1000 || Math.random() < 0.5)) laury.say(MILESTONE[mark] ?? lauryPick(CHECK_IN).replace('{h}', fmt(mark)));
+  }
+
   const z = zoneIndexAt(max);
   if (z > zoneShown) {
     zoneShown = z;
@@ -697,10 +812,11 @@ function music(): void {
   if (!m) return;
   m.duck(mode === 'pause');
   if (mode === 'title') m.play('title');
-  else if (mode === 'play' || mode === 'watch') m.play(`zone${zoneIndexAt(sim.meters)}`);
+  else if (mode === 'play' || mode === 'watch' || mode === 'intro') m.play(`zone${zoneIndexAt(sim.meters)}`);
   else if (mode === 'dying' || mode === 'over') m.play('over');
 }
 
+let padHeld = false;
 function frame(now: number): void {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
@@ -724,7 +840,8 @@ function frame(now: number): void {
     watch!.endTimer += dt;
     if (watch!.endTimer > 1.6) stopWatching();
   }
-  if (mode === 'play' || mode === 'dying' || mode === 'pause' || mode === 'watch') updateHud();
+  if (mode === 'play' || mode === 'dying' || mode === 'pause' || mode === 'watch' || mode === 'intro') updateHud();
+  laury.update(mode === 'pause' ? 0 : dt, calm);
   const alpha = mode === 'play' || mode === 'title' || mode === 'watch' ? Math.min(1, acc / STEP) : 1;
 
   if (ghost && !ghost.done && (mode === 'play' || mode === 'pause' || mode === 'dying')) {
@@ -734,7 +851,7 @@ function frame(now: number): void {
     renderer.ghost = { x, y: p.y + (g.y - p.y) * alpha, label: ghostLabel };
   } else renderer.ghost = null;
 
-  if (mode === 'play' || mode === 'pause' || mode === 'dying') {
+  if (mode === 'play' || mode === 'pause' || mode === 'dying' || mode === 'intro') {
     live.pump(now, { name: cleanName(ui.name.value), skin: skinIdx, meters: Math.floor(sim.meters) });
     const inWorld = daily !== null;
     renderer.rivals = live.rivals(now, mode === 'pause' ? 0 : dt).map((r) => ({ ...r, inWorld }));
@@ -744,7 +861,12 @@ function frame(now: number): void {
   // Calm effects keep Pip still on the logo.
   if (mode === 'title') logo.draw(calm ? 0.3 : now / 1000);
   music();
-  if (input.padConfirm() && (mode === 'title' || mode === 'over')) void startGame(mode === 'title' ? 'endless' : lastKind);
+  // Gamepad: a fresh press moves Laury along; holding it doesn't skip her whole tutorial.
+  const pad = input.padConfirm();
+  if (mode === 'intro') {
+    if (pad && !padHeld) laury.next();
+  } else if (pad && (mode === 'title' || mode === 'over')) void startGame(mode === 'title' ? 'endless' : lastKind);
+  padHeld = pad;
   requestAnimationFrame(frame);
 }
 
@@ -759,6 +881,7 @@ function frame(now: number): void {
   get ghost() {
     return ghost;
   },
+  laury,
   get live() {
     return live;
   },

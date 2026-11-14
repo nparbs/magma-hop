@@ -1,6 +1,10 @@
 // Talks to the board server. Every call fails soft: the game still plays offline, just unranked.
 
+export type Range = 'all' | 'week' | 'daily';
+
 export interface BoardEntry {
+  /** Set when the run can be watched back (played under today's rules). */
+  id: number | null;
   name: string;
   meters: number;
   when: number;
@@ -8,15 +12,31 @@ export interface BoardEntry {
 
 export interface Board {
   top: BoardEntry[];
-  me: { meters: number; rank: number } | null;
+  me: { id: number; meters: number; rank: number } | null;
+  day: string;
 }
 
 export interface FinishResult {
+  id: number | null;
   meters: number;
   best: number;
   rank: number;
-  weekBest: number;
-  weekRank: number;
+  /** Endless runs only. */
+  weekBest?: number;
+  weekRank?: number;
+  /** Daily runs only. */
+  day?: string;
+}
+
+export interface StoredRun {
+  id: number;
+  name: string;
+  meters: number;
+  ticks: number;
+  cause: string;
+  seed: number;
+  log: number[];
+  day: string | null;
 }
 
 async function call<T>(path: string, init: RequestInit = {}, timeout = 4000): Promise<T> {
@@ -35,10 +55,13 @@ async function call<T>(path: string, init: RequestInit = {}, timeout = 4000): Pr
 const post = <T>(path: string, body: unknown, timeout?: number) =>
   call<T>(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, timeout);
 
-export const startRun = () => post<{ runId: string; seed: number }>('api/start', {}, 2500);
+export const startRun = (daily = false) =>
+  post<{ runId: string; seed: number; day: string | null }>('api/start', daily ? { daily: true } : {}, 2500);
 
 export const finishRun = (body: { runId: string; player: string; name: string; ticks: number; log: number[]; meters: number }) =>
   post<FinishResult>('api/finish', body, 15000);
 
-export const fetchBoard = (range: 'all' | 'week', player: string) =>
+export const fetchBoard = (range: Range, player: string) =>
   call<Board>(`api/board?range=${range}&player=${encodeURIComponent(player)}`);
+
+export const fetchRun = (id: number) => call<StoredRun>(`api/run?id=${id}`, {}, 8000);

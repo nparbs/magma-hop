@@ -1,7 +1,7 @@
 {
   "name": "updraft",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "An endless bouncing climb out of a volcano, with a global height board.",
   "type": "module",
   "scripts": {

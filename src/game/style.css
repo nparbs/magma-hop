@@ -203,6 +203,12 @@ button {
   background: rgba(12, 4, 4, 0.5);
 }
 
+/* The board and the how-to open over the title and run-over screens. */
+#board,
+#how {
+  z-index: 5;
+}
+
 .panel {
   width: min(400px, 100%);
   max-height: calc(100% - 8px);
@@ -306,6 +312,65 @@ h2 {
 
 .row.small {
   justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.daily-btn {
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+  font-size: 22px;
+  color: var(--mint);
+}
+
+.daily-btn small {
+  display: block;
+  font-size: 15px;
+  color: var(--dim);
+  font-weight: 400;
+}
+
+.watch-bar {
+  position: absolute;
+  left: 50%;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 14px;
+  border-radius: 6px;
+  background: rgba(30, 10, 10, 0.75);
+  border: 1px solid var(--edge);
+  pointer-events: auto;
+  white-space: nowrap;
+  max-width: calc(100% - 32px);
+}
+
+.watch-bar span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--mint);
+}
+
+.board-list li .watch {
+  margin-left: 8px;
+  padding: 0 8px;
+  border-radius: 4px;
+  background: rgba(111, 242, 224, 0.15);
+  color: var(--mint);
+  font-size: 15px;
+}
+
+.board-list li .watch:hover {
+  background: rgba(111, 242, 224, 0.3);
+}
+
+body.calm .wind,
+body.calm .big-btn {
+  animation: none;
+  transition: none;
 }
 
 .chip {
@@ -469,11 +534,38 @@ h2 {
     padding: 14px 18px 10px;
   }
   .logo {
-    font-size: 44px;
+    font-size: 38px;
   }
   .tag {
-    margin: 6px 0 10px;
-    font-size: 18px;
+    display: none;
+  }
+  .name-row {
+    margin: 8px 0 8px;
+  }
+  .name-row span {
+    display: none;
+  }
+  .name-row input {
+    padding: 5px 12px;
+    font-size: 20px;
+  }
+  .daily-btn {
+    padding: 6px;
+    font-size: 20px;
+    margin-bottom: 8px;
+  }
+  .daily-btn small {
+    display: none;
+  }
+  .btn {
+    padding: 6px 10px;
+  }
+  .row {
+    margin-bottom: 8px;
+  }
+  .chip {
+    padding: 3px 12px;
+    font-size: 16px;
   }
   .big-btn {
     padding: 10px;

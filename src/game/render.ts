@@ -37,6 +37,13 @@ export interface Marker {
   color: string;
 }
 
+/** Another climb drawn as a see-through ember (the Daily Climb ghost). World position and a name tag. */
+export interface Ghost {
+  x: number;
+  y: number;
+  label: string;
+}
+
 // ---------- Color helpers ----------
 
 function rgb(c: string): [number, number, number] {
@@ -93,7 +100,25 @@ const EMBER = sprite(
   EMBER_PAL,
 );
 
-const BAT_PAL = { o: '#6a2458', p: '#e0492a', e: '#ffe66d', F: '#ff9a3c' };
+/** The ember's shape in ghostly blue, for the Daily Climb ghost. */
+const GHOST = sprite(
+  [
+    '....ooooo....',
+    '..ooyyyyyoo..',
+    '.oyyyyyyyyyo.',
+    'oyywyyyywyyyo',
+    'oyywyyyywyyyo',
+    'oyyyyyyyyyyyo',
+    'oyyyyyyyyyyyo',
+    'oyyyyyyyyyyyo',
+    '.oyyyyyyyyyo.',
+    '..ooyyyyyoo..',
+    '....ooooo....',
+  ],
+  { o: '#1d5f96', y: '#4fd2ff', w: '#ffffff' },
+);
+
+const BAT_PAL ={ o: '#6a2458', p: '#e0492a', e: '#ffe66d', F: '#ff9a3c' };
 const BAT = [
   sprite(
     [
@@ -163,6 +188,9 @@ export class Renderer {
   private wind: { x: number; y: number; len: number; sp: number }[] = [];
   private time = 0;
   private face = 1;
+  /** Calm effects: no screen flashes, no shake, no blinking warnings. */
+  calm = false;
+  ghost: Ghost | null = null;
 
   constructor(readonly canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d')!;
@@ -342,6 +370,7 @@ export class Renderer {
     this.drawPickups(sim);
     this.drawHazards(sim, alpha);
     this.drawRockfalls(sim);
+    if (this.ghost) this.drawGhost(this.ghost);
     if (!sim.dead) this.drawPlayer(px, py, sim, k);
     this.drawParticles(k);
     b.restore();
@@ -350,6 +379,10 @@ export class Renderer {
     this.drawSides(camM);
 
     // Blow the buffer up onto the screen.
+    if (this.calm) {
+      this.shake = 0;
+      this.flash = 0;
+    }
     const sh = this.shake > 0.5 ? Math.round(this.shake) : 0;
     const shx = sh ? Math.round((Math.random() - 0.5) * sh) * this.px : 0;
     const shy = sh ? Math.round((Math.random() - 0.5) * sh) * this.px : 0;
@@ -362,6 +395,7 @@ export class Renderer {
     }
     ctx.drawImage(this.buf, shx, shy, this.bw * this.px, this.bh * this.px);
     this.drawMarkerLabels(markers);
+    if (this.ghost) this.drawGhostLabel(this.ghost);
 
     if (this.flash > 0) {
       ctx.globalAlpha = this.flash * 0.5;
@@ -743,7 +777,8 @@ export class Renderer {
       const X = this.ax(f.x);
       if (age < ROCK_WARN) {
         // Warning: a flickering column, pebbles trickling down, and a mark at the top.
-        const blink = Math.floor(this.time * 10) % 2;
+        // Calm effects keep it steady and let it brighten instead.
+        const blink = this.calm ? 1 : Math.floor(this.time * 10) % 2;
         b.globalAlpha = 0.1 + 0.22 * (age / ROCK_WARN) * (blink ? 1 : 0.5);
         this.r(X - half, 0, half * 2, this.bh, '#ffcf6b');
         b.globalAlpha = 1;
@@ -804,6 +839,33 @@ export class Renderer {
     }
     b.globalAlpha = 1;
     this.particles = keep.length > 400 ? keep.slice(-400) : keep;
+  }
+
+  /** The ghost: the same ember, faded and tinted, with no effects. */
+  private drawGhost(g: Ghost): void {
+    if (!this.visible(g.y, 40)) return;
+    const { b } = this;
+    b.globalAlpha = 0.75;
+    this.wrapped(g.x, 40, (x) => {
+      const cx = this.ax(x);
+      const feet = this.ay(g.y);
+      b.drawImage(GHOST, cx - 6, feet - 12);
+      this.r(cx - 1, feet - 15, 3, 1, '#bff6ff');
+      this.r(cx, feet - 17, 1, 2, '#bff6ff');
+    });
+    b.globalAlpha = 1;
+  }
+
+  private drawGhostLabel(g: Ghost): void {
+    if (!this.visible(g.y, 40)) return;
+    const { ctx } = this;
+    ctx.font = `${Math.max(12, 7 * this.px)}px ${FONT}`;
+    ctx.fillStyle = 'rgba(191, 246, 255, 0.75)';
+    ctx.textAlign = 'center';
+    let x = g.x;
+    if (x < 40) x = 40;
+    if (x > WIDTH - 40) x = WIDTH - 40;
+    ctx.fillText(g.label, this.ax(x) * this.px, (this.ay(g.y) - 20) * this.px);
   }
 
   /** Pip: a little ember with big eyes and a flame for hair. */

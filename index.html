@@ -18,6 +18,11 @@
         <div id="hWind" class="wind hidden"></div>
       </div>
       <button id="pauseBtn" class="icon-btn" aria-label="Pause">❚❚</button>
+      <div id="watchBar" class="watch-bar hidden">
+        <span id="watchName"></span>
+        <button id="watchSpeed" class="chip">Speed 1×</button>
+        <button id="watchStop" class="chip">Stop</button>
+      </div>
       <div id="banner" class="banner"></div>
       <div id="toast" class="toast"></div>
       <div id="touchHint" class="touch-hint hidden"><span>◀ hold</span><span>hold ▶</span></div>
@@ -29,15 +34,18 @@
         <p class="tag">The volcano is waking up. Bounce out ahead of the lava.</p>
         <label class="name-row">
           <span>Your name on the board</span>
-          <input id="nameInput" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Climber" />
+          <input id="nameInput" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Name for the board" />
         </label>
         <button id="playBtn" class="big-btn">Climb</button>
+        <button id="dailyBtn" class="btn daily-btn">Daily Climb <small id="dailyNote">one volcano for everyone today</small></button>
         <div class="row">
           <button id="boardBtn" class="btn">Height board</button>
           <button id="howBtn" class="btn">How to play</button>
         </div>
         <div class="row small">
           <button id="soundBtn" class="chip">Sound on</button>
+          <button id="musicBtn" class="chip">Music on</button>
+          <button id="calmBtn" class="chip">Calm effects off</button>
           <button id="tiltBtn" class="chip hidden">Tilt off</button>
         </div>
         <div id="miniBoard" class="mini-board"></div>
@@ -56,6 +64,9 @@
           <li><b>One hit ends the run too:</b> fire bats, rockfalls and fire wisps. You can squash a bat by landing on it from above.</li>
           <li><b>Grab what you find:</b> a steaming geyser vent or a lava bubble carries you up the shaft, safe from everything. A blue shell blocks one hit. Puffcap mushrooms give a big bounce.</li>
           <li><b>It gets harder as you climb:</b> smaller ledges, bigger gaps, drifting ledges, cracked ledges that break after one bounce, fakes whose glowing edge is broken up, steam gusts (watch the arrow) and ice.</li>
+          <li><b>Daily Climb:</b> everyone gets the same volcano for the day (it changes at 00:00 UTC), with its own board. Your best try today races you as a blue ghost.</li>
+          <li><b>Watch the best:</b> press ▶ next to a name on the board to watch that climb.</li>
+          <li><b>Calm effects</b> turns off screen flashes, shaking and blinking warnings.</li>
         </ul>
         <button class="btn close">Got it</button>
       </div>
@@ -67,6 +78,7 @@
         <div class="tabs">
           <button class="tab active" data-range="all">All time</button>
           <button class="tab" data-range="week">This week</button>
+          <button class="tab" data-range="daily">Daily</button>
         </div>
         <ol id="boardList" class="board-list"></ol>
         <div id="boardMe" class="board-me"></div>

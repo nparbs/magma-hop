@@ -3,8 +3,8 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomBytes, randomInt } from 'node:crypto';
-import { Store, playerKey, weekStart } from './db';
+import { createHmac, randomBytes, randomInt } from 'node:crypto';
+import { Store, playerKey, utcDay, weekStart, type Scope } from './db';
 import { INPUT_MAX, SIM_VERSION, TICK_RATE, replay } from '../src/sim/sim';
 import { cleanName } from '../src/sim/names';
 
@@ -23,7 +23,18 @@ const RUN_TTL = 3 * 3600_000;
 const MAX_PENDING = 20_000;
 
 const store = new Store(DB_FILE);
-const pending = new Map<string, { seed: number; issued: number }>();
+const pending = new Map<string, { seed: number; issued: number; day: string | null }>();
+
+/** The Daily Climb seed: the same for everyone on a UTC day, and not guessable before it starts. */
+const DAILY_SECRET = process.env.DAILY_SECRET || store.secret();
+function dailySeed(day: string): number {
+  return (createHmac('sha256', DAILY_SECRET).update('daily:' + day).digest().readUInt32BE(0) % (2 ** 31 - 1)) + 1;
+}
+
+function scopeOf(range: string | null): Scope {
+  if (range === 'daily') return { day: utcDay() };
+  return { since: range === 'week' ? weekStart() : 0 };
+}
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -145,11 +156,18 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
 
   if (url.pathname === '/api/start' && req.method === 'POST') {
     if (!allow('start:' + ip, 40)) return send(res, 429, { error: 'slow down' });
+    let body: any = {};
+    try {
+      body = await readJson(req, 1024);
+    } catch {
+      /* an empty body means an endless run */
+    }
     if (pending.size >= MAX_PENDING) pending.delete(pending.keys().next().value!);
     const runId = randomBytes(12).toString('base64url');
-    const seed = randomInt(1, 2 ** 31);
-    pending.set(runId, { seed, issued: Date.now() });
-    return send(res, 200, { runId, seed, sim: SIM_VERSION });
+    const day = body?.daily === true ? utcDay() : null;
+    const seed = day ? dailySeed(day) : randomInt(1, 2 ** 31);
+    pending.set(runId, { seed, issued: Date.now(), day });
+    return send(res, 200, { runId, seed, sim: SIM_VERSION, day });
   }
 
   if (url.pathname === '/api/finish' && req.method === 'POST') {
@@ -177,29 +195,49 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
 
     const player = playerKey(body.player);
     const name = cleanName(body.name);
-    const week = weekStart();
-    if (r.meters > 0) store.add({ player, name, meters: r.meters, ticks, cause: r.cause || 'quit', seed: run.seed, log: body.log, sim: SIM_VERSION });
+    const id =
+      r.meters > 0
+        ? store.add({ player, name, meters: r.meters, ticks, cause: r.cause || 'quit', seed: run.seed, log: body.log, sim: SIM_VERSION, day: run.day })
+        : null;
+    if (run.day) {
+      const scope = { day: run.day };
+      return send(res, 200, { id, meters: r.meters, day: run.day, best: store.best(player, scope)?.meters ?? r.meters, rank: store.rank(player, r.meters, scope) });
+    }
+    const all = { since: 0 };
+    const week = { since: weekStart() };
     return send(res, 200, {
+      id,
       meters: r.meters,
-      best: store.best(player, 0) ?? r.meters,
-      rank: store.rank(player, r.meters, 0),
-      weekBest: store.best(player, week) ?? r.meters,
+      best: store.best(player, all)?.meters ?? r.meters,
+      rank: store.rank(player, r.meters, all),
+      weekBest: store.best(player, week)?.meters ?? r.meters,
       weekRank: store.rank(player, r.meters, week),
     });
   }
 
   if (url.pathname === '/api/board' && req.method === 'GET') {
     if (!allow('board:' + ip, 60)) return send(res, 429, { error: 'slow down' });
-    const since = url.searchParams.get('range') === 'week' ? weekStart() : 0;
-    const top = store.top(since, 50);
+    const scope = scopeOf(url.searchParams.get('range'));
+    // Only runs under today's rules can be watched, so older ones go out without an id.
+    const top = store.top(scope, 50).map((r) => ({ id: r.sim === SIM_VERSION ? r.id : null, name: r.name, meters: r.meters, when: r.when }));
     const me = url.searchParams.get('player');
     let mine = null;
     if (token(me)) {
       const key = playerKey(me!);
-      const best = store.best(key, since);
-      if (best !== null) mine = { meters: best, rank: store.rank(key, best, since) };
+      const best = store.best(key, scope);
+      if (best !== null) mine = { id: best.id, meters: best.meters, rank: store.rank(key, best.meters, scope) };
     }
-    return send(res, 200, { top, me: mine, weekStart: weekStart() });
+    return send(res, 200, { top, me: mine, weekStart: weekStart(), day: utcDay() });
+  }
+
+  // One stored run's inputs, to watch it back or race it as a ghost.
+  if (url.pathname === '/api/run' && req.method === 'GET') {
+    if (!allow('run:' + ip, 30)) return send(res, 429, { error: 'slow down' });
+    const id = Number(url.searchParams.get('id'));
+    const r = Number.isInteger(id) && id > 0 ? store.run(id) : null;
+    if (!r) return send(res, 404, { error: 'no such run' });
+    if (r.sim !== SIM_VERSION) return send(res, 410, { error: 'played under older rules' });
+    return send(res, 200, { id: r.id, name: r.name, meters: r.meters, ticks: r.ticks, cause: r.cause, seed: r.seed, log: r.log, day: r.day });
   }
 
   send(res, 404, { error: 'not found' });

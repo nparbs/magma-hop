@@ -82,6 +82,56 @@ if (want('zones')) {
   }
 }
 
+/** End the run from the pause menu, or wait out the death if it already ended. */
+async function endIfPlaying(page) {
+  if ((await page.evaluate(() => window.updraft.mode)) === 'play') {
+    await page.keyboard.press('Escape');
+    await page.click('#endBtn');
+  }
+  await page.waitForFunction(() => window.updraft.mode === 'over', null, { timeout: 5000 });
+}
+
+if (want('daily')) {
+  // Needs the board server: a Daily run, then a second try with the first one as the ghost, then watching it back.
+  const page = await open({ width: 1280, height: 720 });
+  await page.fill('#nameInput', 'Ghosty');
+  await page.click('#dailyBtn');
+  await wait(page, 1200);
+  for (let i = 0; i < 6; i++) {
+    await page.keyboard.down(i % 2 ? 'ArrowLeft' : 'ArrowRight');
+    await wait(page, 700);
+    await page.keyboard.up(i % 2 ? 'ArrowLeft' : 'ArrowRight');
+    await wait(page, 300);
+  }
+  await endIfPlaying(page);
+  await wait(page, 2500);
+  await shot(page, 'd1-daily-over');
+  await page.click('#againBtn');
+  await wait(page, 2500);
+  const g = await page.evaluate(() => ({ ghost: !!window.updraft.ghost, mode: window.updraft.mode }));
+  console.log('second daily try:', JSON.stringify(g));
+  await shot(page, 'd2-daily-ghost');
+  await endIfPlaying(page);
+  await wait(page, 1500);
+  await page.click('#oBoardBtn');
+  await wait(page, 800);
+  await shot(page, 'd3-daily-board');
+  await page.click('#boardList .watch');
+  await wait(page, 2500);
+  await shot(page, 'd4-watch');
+  await page.click('#watchSpeed');
+  await wait(page, 1500);
+  await page.click('#watchStop');
+  await wait(page, 800);
+  await shot(page, 'd5-back-to-board');
+}
+
+if (want('small')) {
+  const page = await open({ width: 360, height: 640 }, { touch: true });
+  await wait(page, 1200);
+  await shot(page, 's1-title-360');
+}
+
 if (want('phone')) {
   const page = await open({ width: 390, height: 844 }, { touch: true });
   await wait(page, 1500);

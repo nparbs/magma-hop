@@ -83,18 +83,22 @@ Claude's pick is **B, Volcano escape**: the rising lava explains the new falling
 ## Before going live
 
 - [ ] Owner playtest of v0.2: bounce height, steering speed, how forgiving the first 700 m are, how often rides and shells turn up. All numbers are first guesses (`src/sim/sim.ts` top, `src/sim/zones.ts`).
-- [ ] Merge `v0.2-bouncer` once the owner is happy with it.
+- [ ] Owner listen of the v0.3 music (nobody has heard it yet; the loops are in `src/game/audio.ts`, `SONGS`).
+- [ ] Merge `v0.2-bouncer` and `v0.3` once the owner is happy with them.
 - [ ] VM setup and the Cloudflare hostname (docs/hosting.md).
 - [ ] Add Updraft to the parbs.online landing page.
 
-## v0.3 — feel and fairness (proposed)
+## v0.3 — feel and fairness (built, on branch `v0.3`)
 
-- [ ] Music: a loop per zone that crossfades as you climb.
-- [ ] Reduce-flashing setting.
-- [ ] Ghost of your best run, drawn from your stored inputs.
-- [ ] Watch the top runs: the server already keeps every board run's inputs, so replays are just playback.
-- [ ] Daily Climb: one seed for everyone each day, with its own board.
-- [ ] Tuning pass from playtests: hazard density, crumble and fake rates, wind strength.
+No rule changes, so `SIM_VERSION` stays 2 and v0.2 runs can still be watched.
+
+- [x] Music: a synthesized loop per zone (one tempo, so they crossfade in time), busier the higher you go. Its own Music on/off switch.
+- [x] Calm effects setting: no screen flashes, no shake, steady rockfall warnings. Starts on when the device asks for reduced motion.
+- [x] Daily Climb: one seed for everyone per UTC day, made from a server secret so it can't be worked out ahead of time. Its own board tab. Daily runs don't count on the all-time or weekly boards, since everyone can practise the same seed.
+- [x] Ghost: in the Daily Climb, your best try today races you as a blue ember. With no try yet, you race the day's #1. (A ghost only works on the same seed, so endless runs don't have one.)
+- [x] Watch the top runs: ▶ beside a name on any board plays that climb back, at 1×, 2× or 4×.
+- [x] Fixed: the board opened behind the run-over screen.
+- [ ] Tuning pass from playtests: hazard density, crumble and fake rates, wind strength. Waits for the owner's playtest.
 
 ## Later ideas (not agreed)
 
@@ -109,3 +113,4 @@ Claude's pick is **B, Volcano escape**: the rising lava explains the new falling
 - Ice ledges keep appearing above the Ice Cap (in the Crater Rim and Ash Clouds). Keep them there, or swap them for something that fits those zones?
 - Should ending a run from the pause menu count on the board? It does now.
 - Weekly board resets Monday 00:00 UTC. Is that the right week?
+- The Daily Climb changes at 00:00 UTC and keeps daily runs off the endless boards. Both are Claude's picks; change either if you like.

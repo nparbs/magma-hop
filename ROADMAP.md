@@ -132,6 +132,15 @@ Asked for by the owner on 2026-11-14: see the other players live when you're pla
 - [x] No sim change: `SIM_VERSION` stays 3. `tests/live.test.ts` and `scripts/livecheck.mjs` (two headless climbers) check it.
 - [ ] Owner playtest with a second player.
 
+Laury, the tutorial guide (asked for by the owner on 2026-11-14):
+
+- [x] Laury: a pixel-art volcanologist with a brown ponytail, goggles and a heat jacket, drawn in code. She slides in at the bottom left with a speech bubble, blinks, talks and waves.
+- [x] The first time you try a mode she gives a short tutorial while the run waits: the basics (8 lines, steering explained for keys or touch), then the Daily Climb's own 4 to 5 lines. Next with a tap, Enter, Space or a gamepad button; Skip or Esc ends it.
+- [x] Later runs: a quick joke at the start, then she leaves. About a third of the time it's about how your last run ended (lava, bat, wisp, rockfall, quitting). She avoids repeating her last 12 lines.
+- [x] She checks in at 500 m and 1,000 m, then at each further 500 m mark about half the time.
+- [x] Never blocks steering during play (the bubble ignores touches). **Laury on/off** on the title screen and in the pause menu; How to play has a button to see her tutorial again.
+- [x] Her lines are data in `src/game/laury-lines.ts`. `scripts/laurycheck.mjs` checks the whole flow headless.
+
 ## Later ideas (not agreed)
 
 - More hazards per zone.

@@ -434,6 +434,12 @@ body.calm .big-btn {
   font-size: 18px;
 }
 
+.live-note {
+  margin: -4px 0 10px;
+  font-size: 16px;
+  color: var(--mint);
+}
+
 .mini-board {
   margin-top: 10px;
   text-align: left;

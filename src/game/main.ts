@@ -10,6 +10,7 @@ import { Input } from './input';
 import { Sfx } from './audio';
 import { Playback } from './playback';
 import { fetchBoard, fetchRun, finishRun, startRun, type Board, type Range } from './net';
+import { LiveClimbers, liveCounts } from './live';
 
 declare const __APP_VERSION__: string;
 
@@ -100,6 +101,9 @@ const ui = {
   tilt: $('tiltBtn'),
   pauseTilt: $('pauseTilt'),
   skinName: $('skinName'),
+  live: $('liveBtn'),
+  pauseLive: $('pauseLive'),
+  liveNote: $('liveNote'),
 };
 $('ver').textContent = `v${__APP_VERSION__}`;
 
@@ -224,6 +228,38 @@ if ('ontouchstart' in window && 'DeviceOrientationEvent' in window) {
   label();
 }
 
+// Seeing other players climbing the same mode right now. Off hides them and hides you from them.
+const live = new LiveClimbers();
+let liveOn = store.get('live') !== '0';
+const liveLabel = () => {
+  for (const b of [ui.live, ui.pauseLive]) b.textContent = liveOn ? 'Others on' : 'Others off';
+};
+liveLabel();
+for (const b of [ui.live, ui.pauseLive]) {
+  b.addEventListener('click', () => {
+    liveOn = !liveOn;
+    store.set('live', liveOn ? '1' : '0');
+    liveLabel();
+    sfx.click();
+    if (!liveOn) live.leave();
+    else if (run && (mode === 'play' || mode === 'pause')) live.begin(run.runId);
+    void refreshLiveNote();
+  });
+}
+
+/** On the title screen: how many are climbing right now. */
+async function refreshLiveNote(): Promise<void> {
+  const n = liveOn ? await liveCounts() : null;
+  const bits: string[] = [];
+  if (n?.endless) bits.push(`${n.endless} climbing now`);
+  if (n?.daily) bits.push(`${n.daily} on the Daily Climb`);
+  ui.liveNote.textContent = bits.join(' · ');
+  ui.liveNote.classList.toggle('hidden', !bits.length);
+}
+setInterval(() => {
+  if (mode === 'title' && !document.hidden) void refreshLiveNote();
+}, 10_000);
+
 // ---------- Runs and the board ----------
 
 const ticket = (daily: boolean) => startRun(daily).then((r) => ({ ...r, got: Date.now() }));
@@ -319,6 +355,7 @@ function toTitle(): void {
   watch = null;
   ghost = null;
   daily = null;
+  live.leave();
   prev = { x: sim.x, y: sim.y };
   renderer.snapCamera(sim.lavaY);
   ui.board.classList.add('hidden');
@@ -326,6 +363,7 @@ function toTitle(): void {
   show('title');
   refreshDailyNote();
   void refreshMini();
+  void refreshLiveNote();
   if (!nextRun) prefetchRun();
 }
 
@@ -334,6 +372,7 @@ function resetWorld(seed: number): void {
   bot = null;
   watch = null;
   ghost = null;
+  live.leave();
   rec = new Recorder();
   prev = { x: sim.x, y: sim.y };
   renderer.snapCamera(sim.lavaY);
@@ -369,6 +408,7 @@ async function startGame(kind: 'endless' | 'daily' = lastKind): Promise<void> {
   run = r;
   daily = kind === 'daily' ? r!.day : null;
   resetWorld(r ? r.seed : Math.floor(Math.random() * 2 ** 31));
+  if (liveOn && r) live.begin(r.runId);
   const best = daily ? dailyBest(daily) : localBest;
   bestAnnounced = best === 0;
   show('play');
@@ -509,6 +549,7 @@ function endRun(cause: string): void {
   ui.rank.textContent = run ? 'Checking your climb…' : 'Offline run: not ranked.';
   ui.again.textContent = day ? 'Try today’s again' : 'Climb again';
   ghost = null;
+  live.leave();
   show('over');
   if (isBest) sfx.best();
 
@@ -593,6 +634,7 @@ function tick(): void {
   const i = input.read();
   rec.push(sim.tick + 1, i);
   sim.step(i);
+  live.sample(sim.tick, sim.x, sim.y);
   if (ghost) {
     ghost.step();
     ghost.sim.events.length = 0;
@@ -614,6 +656,7 @@ function updateHud(): void {
     if (daily) bits.push('Daily Climb');
     if (best && !(max > best)) bits.push(`Best ${fmt(best)}`);
     if (!run && mode === 'play') bits.push('Offline: not ranked');
+    if (live.count) bits.push(`${live.count} climbing with you`);
     if (!bestAnnounced && max > best) {
       bestAnnounced = true;
       toast(daily ? 'Best today!' : 'New best!');
@@ -691,6 +734,12 @@ function frame(now: number): void {
     renderer.ghost = { x, y: p.y + (g.y - p.y) * alpha, label: ghostLabel };
   } else renderer.ghost = null;
 
+  if (mode === 'play' || mode === 'pause' || mode === 'dying') {
+    live.pump(now, { name: cleanName(ui.name.value), skin: skinIdx, meters: Math.floor(sim.meters) });
+    const inWorld = daily !== null;
+    renderer.rivals = live.rivals(now, mode === 'pause' ? 0 : dt).map((r) => ({ ...r, inWorld }));
+  } else renderer.rivals = [];
+
   renderer.draw(sim, alpha, prev, markers(), mode === 'pause' ? 0 : dt);
   // Calm effects keep Pip still on the logo.
   if (mode === 'title') logo.draw(calm ? 0.3 : now / 1000);
@@ -709,6 +758,9 @@ function frame(now: number): void {
   },
   get ghost() {
     return ghost;
+  },
+  get live() {
+    return live;
   },
   get music() {
     return sfx.music?.state ?? null;

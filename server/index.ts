@@ -5,7 +5,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHmac, randomBytes, randomInt } from 'node:crypto';
 import { Store, playerKey, utcDay, weekStart, type Scope } from './db';
-import { INPUT_MAX, SIM_VERSION, TICK_RATE, replay } from '../src/sim/sim';
+import { INPUT_MAX, SIM_VERSION, TICK_RATE, WIDTH, replay } from '../src/sim/sim';
+import { LiveRoom, validPts } from './live';
 import { cleanName } from '../src/sim/names';
 
 declare const __APP_VERSION__: string;
@@ -23,7 +24,9 @@ const RUN_TTL = 3 * 3600_000;
 const MAX_PENDING = 20_000;
 
 const store = new Store(DB_FILE);
-const pending = new Map<string, { seed: number; issued: number; day: string | null }>();
+const pending = new Map<string, { seed: number; issued: number; day: string | null; pub: string }>();
+/** Who is climbing right now, so players in the same mode can see each other. */
+const live = new LiveRoom();
 
 /** The Daily Climb seed: the same for everyone on a UTC day, and not guessable before it starts. */
 const DAILY_SECRET = process.env.DAILY_SECRET || store.secret();
@@ -95,6 +98,7 @@ setInterval(() => {
   const now = Date.now();
   for (const [k, b] of buckets) if (now - b.at > 60_000) buckets.delete(k);
   for (const [k, r] of pending) if (now - r.issued > RUN_TTL) pending.delete(k);
+  live.sweep(now);
 }, 60_000).unref();
 
 function clientIp(req: http.IncomingMessage): string {
@@ -182,7 +186,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
     const runId = randomBytes(12).toString('base64url');
     const day = body?.daily === true ? utcDay() : null;
     const seed = day ? dailySeed(day) : randomInt(1, 2 ** 31);
-    pending.set(runId, { seed, issued: Date.now(), day });
+    pending.set(runId, { seed, issued: Date.now(), day, pub: randomBytes(6).toString('base64url') });
     return send(res, 200, { runId, seed, sim: SIM_VERSION, day });
   }
 
@@ -197,6 +201,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
     const run = typeof body?.runId === 'string' ? pending.get(body.runId) : undefined;
     if (!run) return send(res, 404, { error: 'unknown run' });
     pending.delete(body.runId);
+    live.leave(body.runId);
     const ticks = body.ticks;
     if (!token(body.player) || !Number.isInteger(ticks) || ticks < 1 || ticks > MAX_TICKS || !validLog(body.log, ticks)) {
       return send(res, 400, { error: 'bad run' });
@@ -233,6 +238,36 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
     });
   }
 
+  // A live run says where it is and hears where everyone else in its mode is.
+  if (url.pathname === '/api/live' && req.method === 'POST') {
+    let body: any;
+    try {
+      body = await readJson(req, 8 * 1024);
+    } catch {
+      return send(res, 400, { error: 'bad request' });
+    }
+    const run = typeof body?.runId === 'string' ? pending.get(body.runId) : undefined;
+    if (!run) return send(res, 404, { error: 'unknown run' });
+    // Several people can share one home address, so the per-address limit is loose; each run gets its own.
+    if (!allow('live:' + body.runId, 400) || !allow('liveip:' + ip, 2400)) return send(res, 429, { error: 'slow down' });
+    if (body.leave === true) {
+      live.leave(body.runId);
+      return send(res, 200, { others: [] });
+    }
+    if (!validPts(body.pts, WIDTH)) return send(res, 400, { error: 'bad points' });
+    const meters = Number.isInteger(body.meters) && body.meters >= 0 && body.meters < 1e6 ? body.meters : 0;
+    const skin = Number.isInteger(body.skin) && body.skin >= 0 && body.skin < 32 ? body.skin : 0;
+    const mode = run.day ? 'daily:' + run.day : 'endless';
+    const others = live.post(body.runId, { pub: run.pub, mode, name: cleanName(body.name), skin, meters }, body.pts);
+    return send(res, 200, { others });
+  }
+
+  if (url.pathname === '/api/live' && req.method === 'GET') {
+    if (!allow('livecount:' + ip, 60)) return send(res, 429, { error: 'slow down' });
+    const n = live.counts();
+    return send(res, 200, { endless: n.endless ?? 0, daily: n['daily:' + utcDay()] ?? 0 });
+  }
+
   if (url.pathname === '/api/board' && req.method === 'GET') {
     if (!allow('board:' + ip, 60)) return send(res, 429, { error: 'slow down' });
     const scope = scopeOf(url.searchParams.get('range'));
@@ -264,7 +299,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
 const server = http.createServer((req, res) => {
   const url = new URL(req.url ?? '/', 'http://x');
   if (url.pathname === '/health') {
-    return send(res, 200, { ok: true, version: __APP_VERSION__, sim: SIM_VERSION, climbers: store.climbers(), pending: pending.size });
+    return send(res, 200, { ok: true, version: __APP_VERSION__, sim: SIM_VERSION, climbers: store.climbers(), pending: pending.size, live: live.size });
   }
   if (url.pathname.startsWith('/api/')) {
     api(req, res, url).catch((e) => {

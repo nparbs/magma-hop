@@ -47,6 +47,7 @@
         </label>
         <button id="playBtn" class="big-btn">Climb</button>
         <button id="dailyBtn" class="btn daily-btn">Daily Climb <small id="dailyNote">one volcano for everyone today</small></button>
+        <div id="liveNote" class="live-note hidden"></div>
         <div class="row">
           <button id="boardBtn" class="btn">Height board</button>
           <button id="howBtn" class="btn">How to play</button>
@@ -56,6 +57,7 @@
           <button id="musicBtn" class="chip">Music on</button>
           <button id="calmBtn" class="chip">Calm effects off</button>
           <button id="tiltBtn" class="chip hidden">Tilt off</button>
+          <button id="liveBtn" class="chip">Others on</button>
         </div>
         <div id="miniBoard" class="mini-board"></div>
         <div id="ver" class="ver"></div>
@@ -75,6 +77,7 @@
           <li><b>Grab what you find:</b> a steaming geyser vent or a lava bubble carries you up the shaft, safe from everything. A blue shell blocks one hit. Puffcap mushrooms give a big bounce.</li>
           <li><b>It gets harder as you climb:</b> smaller ledges, bigger gaps, drifting ledges, cracked ledges that break after one bounce, fakes whose glowing edge is broken up, steam gusts (watch the arrow) and ice.</li>
           <li><b>Daily Climb:</b> everyone gets the same volcano for the day (it changes at 00:00 UTC), with its own board. Your best try today races you as a blue ghost.</li>
+          <li><b>Climb with others:</b> anyone playing the same mode as you at the same time shows up live. In the Daily Climb you share the volcano, so you see them hopping beside you. In endless runs everyone has their own volcano, so you see a notch on the wall at their height. An arrow at the top or bottom points to anyone out of view. <b>Others off</b> hides them and hides you from them.</li>
           <li><b>Watch the best:</b> press ▶ next to a name on the board to watch that climb.</li>
           <li><b>Calm effects</b> turns off screen flashes, shaking and blinking warnings.</li>
         </ul>
@@ -103,6 +106,7 @@
         <button id="endBtn" class="btn">End run here</button>
         <div class="row small pause-chips">
           <button id="pauseTilt" class="chip hidden">Tilt off</button>
+          <button id="pauseLive" class="chip">Others on</button>
         </div>
       </div>
     </section>

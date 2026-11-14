@@ -44,6 +44,18 @@ export interface Ghost {
   label: string;
 }
 
+/**
+ * Another player climbing right now. `inWorld`: they're on the same volcano (the Daily Climb), so draw
+ * them where they are. Otherwise their tower is a different one, so only their height is shown.
+ */
+export interface Rival {
+  x: number;
+  y: number;
+  name: string;
+  skin: number;
+  inWorld: boolean;
+}
+
 // ---------- Color helpers ----------
 
 function rgb(c: string): [number, number, number] {
@@ -400,6 +412,8 @@ export class Renderer {
   /** Calm effects: no screen flashes, no shake, no blinking warnings. */
   calm = false;
   ghost: Ghost | null = null;
+  /** Other players climbing the same mode right now. */
+  rivals: Rival[] = [];
   /** The climber's look. */
   skin: Skin = SKINS[0];
 
@@ -582,6 +596,7 @@ export class Renderer {
     this.drawHazards(sim, alpha);
     this.drawRockfalls(sim);
     if (this.ghost) this.drawGhost(this.ghost);
+    this.drawRivals();
     if (!sim.dead) this.drawPlayer(px, py, sim, k);
     this.drawParticles(k);
     b.restore();
@@ -607,6 +622,7 @@ export class Renderer {
     ctx.drawImage(this.buf, shx, shy, this.bw * this.px, this.bh * this.px);
     this.drawMarkerLabels(markers);
     if (this.ghost) this.drawGhostLabel(this.ghost);
+    this.drawRivalLabels();
 
     if (this.flash > 0) {
       ctx.globalAlpha = this.flash * 0.5;
@@ -1077,6 +1093,74 @@ export class Renderer {
     if (x < 40) x = 40;
     if (x > WIDTH - 40) x = WIDTH - 40;
     ctx.fillText(g.label, this.ax(x) * this.px, (this.ay(g.y) - 20) * this.px);
+  }
+
+  /** Other live climbers: their own look, see-through, with no effects. Endless ones get a tick on the wall. */
+  private drawRivals(): void {
+    const { b } = this;
+    for (const rv of this.rivals) {
+      if (!this.visible(rv.y, 40)) continue;
+      const s = skinAt(rv.skin);
+      if (!rv.inWorld) {
+        // A different tower: a notch on the left wall at their height, in their colors.
+        const y = this.ay(rv.y) - 8;
+        for (let i = 0; i < 4; i++) this.r(this.ox, y + i, 5 - i, 1, s.pal.o);
+        for (let i = 1; i < 4; i++) this.r(this.ox, y - i, 5 - i, 1, s.pal.o);
+        for (let i = 0; i < 3; i++) this.r(this.ox, y + i, 3 - i, 1, s.pal.y);
+        for (let i = 1; i < 3; i++) this.r(this.ox, y - i, 3 - i, 1, s.pal.y);
+        continue;
+      }
+      b.globalAlpha = 0.6;
+      this.wrapped(rv.x, 40, (x) => {
+        const cx = this.ax(x);
+        const feet = this.ay(rv.y);
+        const top = feet - 12;
+        b.drawImage(s.sprite, cx - 6, top);
+        for (const e of [-3, 2]) {
+          this.r(cx + e, top + 4, 2, 3, '#ffffff');
+          this.r(cx + e + 1, top + 5, 1, 2, '#2a0d12');
+        }
+        this.r(cx - 1, top - 1, 3, 1, s.flame[0]);
+        this.r(cx, top - 3, 1, 2, s.flame[1]);
+      });
+      b.globalAlpha = 1;
+    }
+  }
+
+  /** Name tags over live climbers on screen, and arrows at the top or bottom edge for the ones off it. */
+  private drawRivalLabels(): void {
+    if (!this.rivals.length) return;
+    const { ctx } = this;
+    const size = Math.max(12, 7 * this.px);
+    ctx.font = `${size}px ${FONT}`;
+    let above = 0;
+    let below = 0;
+    for (const rv of this.rivals) {
+      const s = skinAt(rv.skin);
+      const m = `${Math.max(0, Math.floor(rv.y / UNITS_PER_METER)).toLocaleString('en-US')} m`;
+      const top = this.camBottom + this.bh * A;
+      ctx.globalAlpha = 0.85;
+      ctx.fillStyle = s.pal.h;
+      if (rv.y > top - 30) {
+        // Higher than the view: stack along the top edge.
+        ctx.textAlign = 'left';
+        ctx.fillText(`▲ ${rv.name} ${m}`, (this.ox + 3) * this.px, (40 + above * 9) * this.px);
+        above++;
+      } else if (rv.y < this.camBottom + LAVA_SHOW) {
+        // Below the view (behind you): stack just above the lava.
+        ctx.textAlign = 'left';
+        ctx.fillText(`▼ ${rv.name} ${m}`, (this.ox + 3) * this.px, (this.bh - 22 - below * 9) * this.px);
+        below++;
+      } else if (rv.inWorld) {
+        ctx.textAlign = 'center';
+        const x = Math.max(40, Math.min(WIDTH - 40, rv.x));
+        ctx.fillText(rv.name, this.ax(x) * this.px, (this.ay(rv.y) - 18) * this.px);
+      } else {
+        ctx.textAlign = 'left';
+        ctx.fillText(rv.name, (this.ox + 6) * this.px, (this.ay(rv.y) - 3) * this.px);
+      }
+    }
+    ctx.globalAlpha = 1;
   }
 
   /** Pip: a little ember with big eyes and a flame for hair. */

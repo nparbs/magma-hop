@@ -119,6 +119,19 @@ Asked for by the owner after playing v0.3 live.
 - [x] Tilt steering on phones was already there (the Tilt switch on the title screen). It's now also in the pause menu, says so when the phone refuses it, and the how-to explains it.
 - [x] `scripts/musiccheck.mjs` walks the screens headless and checks the music follows; `tests/songs.test.ts` checks every song's patterns.
 
+## v0.5 — climb together (built, on branch `v0.5-live`)
+
+Asked for by the owner on 2026-11-14: see the other players live when you're playing the same mode.
+
+- [x] Every live run posts its recent positions four times a second (`POST /api/live`) and gets back the other climbers in the same mode: endless, or today's Daily Climb. Up to 12, closest in height first. Kept in server memory only, never on the board; a climber drops off 4 s after their last post, or at once when the run ends.
+- [x] Others are drawn about half a second behind real time, smoothed between samples.
+- [x] Daily Climb: everyone is on the same volcano, so others hop beside you, see-through, in their own look, with a name tag.
+- [x] Endless: everyone has their own volcano, so drawing them on your ledges would look wrong. Instead each one is a notch on the left wall at their height, with their name.
+- [x] Anyone above or below the view gets an arrow with their name and height at the top or bottom edge. The HUD says how many are climbing with you, and the title screen how many are climbing now.
+- [x] **Others on/off** on the title screen and in the pause menu. Off hides them and hides you from them.
+- [x] No sim change: `SIM_VERSION` stays 3. `tests/live.test.ts` and `scripts/livecheck.mjs` (two headless climbers) check it.
+- [ ] Owner playtest with a second player.
+
 ## Later ideas (not agreed)
 
 - More hazards per zone.

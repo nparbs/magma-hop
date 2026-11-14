@@ -9,6 +9,7 @@ player ──https──> Cloudflare ──tunnel──> cloudflared (Scrap Riot
                                                                           ├─ /api/finish   replay + store a run
                                                                           ├─ /api/board    top 50: all time, this week or today's daily
                                                                           ├─ /api/run      one stored run's inputs, to watch it back
+                                                                          ├─ /api/live     who is climbing right now (memory only)
                                                                           └─ /health       status
 ```
 

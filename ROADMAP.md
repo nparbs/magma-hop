@@ -119,7 +119,7 @@ Asked for by the owner after playing v0.3 live.
 - [x] Tilt steering on phones was already there (the Tilt switch on the title screen). It's now also in the pause menu, says so when the phone refuses it, and the how-to explains it.
 - [x] `scripts/musiccheck.mjs` walks the screens headless and checks the music follows; `tests/songs.test.ts` checks every song's patterns.
 
-## v0.5 — climb together (built, on branch `v0.5-live`)
+## v0.5 — climb together, and Laury (live, 2026-11-14)
 
 Asked for by the owner on 2026-11-14: see the other players live when you're playing the same mode.
 

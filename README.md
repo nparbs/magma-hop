@@ -41,6 +41,7 @@ Without the server the game still plays, but runs aren't ranked.
 | `scripts/` | Server build, screenshots, `musiccheck.mjs`, `livecheck.mjs`, `laurycheck.mjs`, `climb.ts` bot stats, `ship.mjs`. |
 | `deploy/` | The script the VM runs on each deploy (`deploy-magma-hop.sh`). |
 | `docs/hosting.md` | VM, tunnel and deploy setup. |
+| `docs/HANDOFF.md` | Where things stand, for whoever picks this up next. |
 
 ## How the board stays honest
 

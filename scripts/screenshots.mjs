@@ -126,6 +126,22 @@ if (want('daily')) {
   await shot(page, 'd5-back-to-board');
 }
 
+if (want('skins')) {
+  // Every look on the logo, then one in play.
+  const page = await open({ width: 1280, height: 720 });
+  for (let i = 0; i < 5; i++) {
+    await page.locator('.logo-row').screenshot({ path: `shots/k${i}-logo.png` });
+    console.log('shot', `k${i}-logo`, await page.textContent('#skinName'));
+    await page.click('#skinNext');
+    await wait(page, 300);
+  }
+  await page.click('#skinNext');
+  await page.click('#skinNext');
+  await page.click('#playBtn');
+  await wait(page, 1200);
+  await shot(page, 'k5-play');
+}
+
 if (want('small')) {
   const page = await open({ width: 360, height: 640 }, { touch: true });
   await wait(page, 1200);

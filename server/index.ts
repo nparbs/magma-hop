@@ -211,9 +211,11 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
 
     const player = playerKey(body.player);
     const name = cleanName(body.name);
+    // The look is cosmetic: anything odd just becomes the default.
+    const skin = Number.isInteger(body.skin) && body.skin >= 0 && body.skin < 32 ? body.skin : 0;
     const id =
       r.meters > 0
-        ? store.add({ player, name, meters: r.meters, ticks, cause: r.cause || 'quit', seed: run.seed, log: body.log, sim: SIM_VERSION, day: run.day })
+        ? store.add({ player, name, meters: r.meters, ticks, cause: r.cause || 'quit', seed: run.seed, log: body.log, sim: SIM_VERSION, day: run.day, skin })
         : null;
     if (run.day) {
       const scope = { day: run.day };
@@ -253,7 +255,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
     const r = Number.isInteger(id) && id > 0 ? store.run(id) : null;
     if (!r) return send(res, 404, { error: 'no such run' });
     if (r.sim !== SIM_VERSION) return send(res, 410, { error: 'played under older rules' });
-    return send(res, 200, { id: r.id, name: r.name, meters: r.meters, ticks: r.ticks, cause: r.cause, seed: r.seed, log: r.log, day: r.day });
+    return send(res, 200, { id: r.id, name: r.name, meters: r.meters, ticks: r.ticks, cause: r.cause, seed: r.seed, log: r.log, day: r.day, skin: r.skin });
   }
 
   send(res, 404, { error: 'not found' });

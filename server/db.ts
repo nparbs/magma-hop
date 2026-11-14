@@ -25,6 +25,7 @@ export interface StoredRun {
   log: number[];
   sim: number;
   day: string | null;
+  skin: number;
   created: number;
 }
 
@@ -79,6 +80,8 @@ export class Store {
     if (!cols.some((c) => c.name === 'sim')) this.db.exec('ALTER TABLE runs ADD COLUMN sim INTEGER NOT NULL DEFAULT 1');
     // The Daily Climb date for daily runs, NULL for endless runs.
     if (!cols.some((c) => c.name === 'day')) this.db.exec('ALTER TABLE runs ADD COLUMN day TEXT');
+    // Which look the climber had (cosmetic, shown when the run is watched back).
+    if (!cols.some((c) => c.name === 'skin')) this.db.exec('ALTER TABLE runs ADD COLUMN skin INTEGER NOT NULL DEFAULT 0');
     this.db.exec('CREATE INDEX IF NOT EXISTS runs_day ON runs (day, meters DESC)');
   }
 
@@ -91,10 +94,10 @@ export class Store {
     return v;
   }
 
-  add(r: { player: string; name: string; meters: number; ticks: number; cause: string; seed: number; log: number[]; sim: number; day?: string | null }): number {
+  add(r: { player: string; name: string; meters: number; ticks: number; cause: string; seed: number; log: number[]; sim: number; day?: string | null; skin?: number }): number {
     const res = this.db
-      .prepare('INSERT INTO runs (player, name, meters, ticks, cause, seed, log, created, sim, day) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(r.player, r.name, r.meters, r.ticks, r.cause, r.seed, JSON.stringify(r.log), Date.now(), r.sim, r.day ?? null);
+      .prepare('INSERT INTO runs (player, name, meters, ticks, cause, seed, log, created, sim, day, skin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(r.player, r.name, r.meters, r.ticks, r.cause, r.seed, JSON.stringify(r.log), Date.now(), r.sim, r.day ?? null, r.skin ?? 0);
     // A climber's newest name shows on all their runs.
     this.db.prepare('UPDATE runs SET name = ? WHERE player = ?').run(r.name, r.player);
     return Number(res.lastInsertRowid);
@@ -134,7 +137,7 @@ export class Store {
 
   run(id: number): StoredRun | null {
     const row = this.db
-      .prepare('SELECT id, name, meters, ticks, cause, seed, log, sim, day, created FROM runs WHERE id = ?')
+      .prepare('SELECT id, name, meters, ticks, cause, seed, log, sim, day, skin, created FROM runs WHERE id = ?')
       .get(id) as (Omit<StoredRun, 'log'> & { log: string }) | undefined;
     return row ? { ...row, log: JSON.parse(row.log) } : null;
   }

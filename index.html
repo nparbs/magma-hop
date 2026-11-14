@@ -34,7 +34,12 @@
 
     <section id="title" class="panel-wrap">
       <div class="panel title-panel">
-        <h1 class="logo"><canvas id="logoArt" class="logo-art" aria-hidden="true"></canvas><span class="sr">Magma Hop</span></h1>
+        <div class="logo-row">
+          <button id="skinPrev" class="skin-arrow" aria-label="Previous look">◀</button>
+          <h1 class="logo"><canvas id="logoArt" class="logo-art" aria-hidden="true"></canvas><span class="sr">Magma Hop</span></h1>
+          <button id="skinNext" class="skin-arrow" aria-label="Next look">▶</button>
+        </div>
+        <div id="skinName" class="skin-name">Pip</div>
         <p class="tag">The volcano is waking up. Hop out ahead of the lava.</p>
         <label class="name-row">
           <span>Your name on the board</span>
@@ -62,7 +67,8 @@
         <h2>How to play</h2>
         <ul class="how">
           <li><b>You hop by yourself.</b> Land on a ledge and you spring up again.</li>
-          <li><b>Steer left and right:</b> ← → or A / D, a gamepad, or hold the left or right half of the screen. Phones can use tilt too.</li>
+          <li><b>Steer left and right:</b> ← → or A / D, a gamepad, or hold the left or right half of the screen. On a phone you can tilt it instead: tap <b>Tilt</b> on this screen or in the pause menu (iPhones ask first).</li>
+          <li><b>Pick a look</b> with the arrows beside the logo. It's only for show.</li>
           <li><b>The edges wrap.</b> Go off one side and you come back on the other.</li>
           <li><b>Don't fall.</b> The view only moves up and the lava follows it. Drop off the bottom and the run is over. Your score is the highest point you reached.</li>
           <li><b>One hit ends the run too:</b> fire bats, rockfalls and fire wisps. You can squash a bat by landing on it from above.</li>
@@ -95,6 +101,9 @@
         <h2>Paused</h2>
         <button id="resumeBtn" class="big-btn">Resume</button>
         <button id="endBtn" class="btn">End run here</button>
+        <div class="row small pause-chips">
+          <button id="pauseTilt" class="chip hidden">Tilt off</button>
+        </div>
       </div>
     </section>
 

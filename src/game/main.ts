@@ -5,7 +5,7 @@ import { Kind, PickupKind, Recorder, Sim, TICK_RATE, UNITS_PER_METER } from '../
 import { Bot } from '../sim/bot';
 import { ZONES, zoneIndexAt } from '../sim/zones';
 import { cleanName } from '../sim/names';
-import { Logo, Renderer, type Marker } from './render';
+import { Logo, Renderer, SKINS, skinAt, type Marker } from './render';
 import { Input } from './input';
 import { Sfx } from './audio';
 import { Playback } from './playback';
@@ -98,6 +98,8 @@ const ui = {
   music: $('musicBtn'),
   calm: $('calmBtn'),
   tilt: $('tiltBtn'),
+  pauseTilt: $('pauseTilt'),
+  skinName: $('skinName'),
 };
 $('ver').textContent = `v${__APP_VERSION__}`;
 
@@ -180,17 +182,46 @@ ui.calm.addEventListener('click', () => {
   sfx.click();
 });
 
-// Tilt only makes sense on touch devices.
-if ('ontouchstart' in window && 'DeviceOrientationEvent' in window) {
-  ui.tilt.classList.remove('hidden');
-  const label = () => (ui.tilt.textContent = input.tiltOn ? 'Tilt on' : 'Tilt off');
-  if (store.get('tilt') === '1') void input.enableTilt().then(label);
-  ui.tilt.addEventListener('click', async () => {
-    if (input.tiltOn) input.tiltOn = false;
-    else await input.enableTilt();
-    store.set('tilt', input.tiltOn ? '1' : '0');
-    label();
+// The climber's look. Cosmetic: it's sent with a run only so replays show it.
+let skinIdx = Math.max(0, Math.min(SKINS.length - 1, Math.floor(Number(store.get('skin') ?? 0)) || 0));
+function applySkin(i = skinIdx): void {
+  const s = skinAt(i);
+  renderer.skin = s;
+  logo.skin = s;
+  ui.skinName.textContent = s.name;
+}
+applySkin();
+for (const [id, d] of [['skinPrev', -1], ['skinNext', 1]] as const) {
+  $(id).addEventListener('click', () => {
+    skinIdx = (skinIdx + d + SKINS.length) % SKINS.length;
+    store.set('skin', String(skinIdx));
+    applySkin();
+    sfx.unlock();
+    sfx.click();
   });
+}
+
+// Tilt to steer, on phones and tablets. The switch is on the title screen and in the pause menu.
+// iPhones only allow it after asking, from a tap.
+if ('ontouchstart' in window && 'DeviceOrientationEvent' in window) {
+  const label = () => {
+    for (const b of [ui.tilt, ui.pauseTilt]) b.textContent = input.tiltOn ? 'Tilt on' : 'Tilt off';
+  };
+  for (const b of [ui.tilt, ui.pauseTilt]) {
+    b.classList.remove('hidden');
+    b.addEventListener('click', async () => {
+      if (input.tiltOn) input.tiltOn = false;
+      else if (!(await input.enableTilt())) {
+        b.textContent = 'Tilt not allowed';
+        return;
+      }
+      store.set('tilt', input.tiltOn ? '1' : '0');
+      label();
+    });
+  }
+  // Android turns it straight back on; iPhones need the tap again, so the label stays honest.
+  if (store.get('tilt') === '1') void input.enableTilt().then(label);
+  label();
 }
 
 // ---------- Runs and the board ----------
@@ -291,6 +322,7 @@ function toTitle(): void {
   prev = { x: sim.x, y: sim.y };
   renderer.snapCamera(sim.lavaY);
   ui.board.classList.add('hidden');
+  applySkin();
   show('title');
   refreshDailyNote();
   void refreshMini();
@@ -396,6 +428,7 @@ async function watchRun(id: number): Promise<void> {
   sim = pb.sim;
   prev = { x: sim.x, y: sim.y };
   watch = { pb, speed: 1, endTimer: 0 };
+  applySkin(r.skin ?? 0);
   ui.watchSpeed.textContent = 'Speed 1×';
   ui.watchName.textContent = `${r.name} · ${fmt(r.meters)}${r.day ? ' · Daily' : ''}`;
   show('watch');
@@ -481,7 +514,7 @@ function endRun(cause: string): void {
 
   if (run && meters > 0) {
     const r = run;
-    finishRun({ runId: r.runId, player: PLAYER, name: cleanName(ui.name.value), ticks: sim.tick, log: rec.log, meters })
+    finishRun({ runId: r.runId, player: PLAYER, name: cleanName(ui.name.value), ticks: sim.tick, log: rec.log, meters, skin: skinIdx })
       .then((res) => {
         ui.rank.textContent = res.day ? `#${res.rank} on today’s Daily Climb` : `#${res.rank} all time · #${res.weekRank} this week`;
       })
@@ -615,12 +648,14 @@ function markers(): Marker[] {
   return out;
 }
 
+/** Every screen has its music; changing screen or zone crossfades. Pausing muffles what's playing. */
 function music(): void {
   const m = sfx.music;
   if (!m) return;
-  if (mode === 'title') m.play(0);
-  else if (mode === 'play' || mode === 'watch') m.play(zoneIndexAt(sim.meters));
-  else m.stop(mode === 'dying' ? 1.2 : 0.4);
+  m.duck(mode === 'pause');
+  if (mode === 'title') m.play('title');
+  else if (mode === 'play' || mode === 'watch') m.play(`zone${zoneIndexAt(sim.meters)}`);
+  else if (mode === 'dying' || mode === 'over') m.play('over');
 }
 
 function frame(now: number): void {
@@ -674,6 +709,9 @@ function frame(now: number): void {
   },
   get ghost() {
     return ghost;
+  },
+  get music() {
+    return sfx.music?.state ?? null;
   },
   renderer,
   startGame,

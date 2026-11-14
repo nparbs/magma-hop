@@ -37,6 +37,8 @@ export interface StoredRun {
   seed: number;
   log: number[];
   day: string | null;
+  /** The climber's look; older servers may leave it out. */
+  skin?: number;
 }
 
 async function call<T>(path: string, init: RequestInit = {}, timeout = 4000): Promise<T> {
@@ -58,7 +60,7 @@ const post = <T>(path: string, body: unknown, timeout?: number) =>
 export const startRun = (daily = false) =>
   post<{ runId: string; seed: number; day: string | null }>('api/start', daily ? { daily: true } : {}, 2500);
 
-export const finishRun = (body: { runId: string; player: string; name: string; ticks: number; log: number[]; meters: number }) =>
+export const finishRun = (body: { runId: string; player: string; name: string; ticks: number; log: number[]; meters: number; skin: number }) =>
   post<FinishResult>('api/finish', body, 15000);
 
 export const fetchBoard = (range: Range, player: string) =>

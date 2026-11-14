@@ -233,6 +233,44 @@ button {
   text-shadow: 0 4px 0 #7a3f12;
 }
 
+.logo-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.logo-row .logo {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.skin-arrow {
+  flex: none;
+  width: 36px;
+  height: 44px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--edge);
+  color: var(--hot);
+  font-size: 16px;
+}
+
+.skin-arrow:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.skin-name {
+  margin-top: -2px;
+  color: var(--hot);
+  font-size: 18px;
+  letter-spacing: 1px;
+}
+
+.pause-chips {
+  margin: 12px 0 0;
+}
+
 /* The logo is pixel art drawn by render.ts (Logo), blown up 4x with hard edges. */
 .logo-art {
   display: block;
@@ -551,6 +589,15 @@ body.calm .big-btn {
   .logo-art {
     width: 77px;
     margin-top: -6px;
+  }
+  .skin-arrow {
+    width: 30px;
+    height: 30px;
+    font-size: 13px;
+  }
+  .skin-name {
+    margin-top: -4px;
+    font-size: 15px;
   }
   .tag {
     display: none;

@@ -50,11 +50,13 @@ describe('board', () => {
 
   it('hands back a stored run with its inputs', () => {
     const s = new Store(':memory:');
-    const id = s.add(run('a', 'Ann', 120, '2026-11-14'));
+    const id = s.add({ ...run('a', 'Ann', 120, '2026-11-14'), skin: 3 });
     const r = s.run(id)!;
-    expect(r).toMatchObject({ id, name: 'Ann', meters: 120, seed: 1, sim: 2, day: '2026-11-14', log: [5, 4, 9, 0] });
+    expect(r).toMatchObject({ id, name: 'Ann', meters: 120, seed: 1, sim: 2, day: '2026-11-14', log: [5, 4, 9, 0], skin: 3 });
     expect(s.top({ day: '2026-11-14' }, 1)[0].id).toBe(id);
     expect(s.run(id + 1)).toBeNull();
+    // Runs sent without a look get the default one.
+    expect(s.run(s.add(run('b', 'Bo', 50)))!.skin).toBe(0);
   });
 
   it('makes one secret and keeps it', () => {

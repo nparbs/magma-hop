@@ -104,10 +104,20 @@ No rule changes, so `SIM_VERSION` stays 2 and v0.2 runs can still be watched.
 - [x] Fixed: the board opened behind the run-over screen.
 - [ ] Tuning pass from playtests: hazard density, crumble and fake rates, wind strength. Waits for the owner's playtest.
 
+## v0.4 — music and looks (built, 2026-11-14)
+
+Asked for by the owner after playing v0.3 live.
+
+- [x] Several songs per zone (3 in the first two zones, 2 in the rest), each with its own tempo and melody. A zone's songs take turns every few loops.
+- [x] A title theme and a run-over theme. Every change of zone or screen crossfades; pausing muffles the music instead of stopping it.
+- [x] Five looks for the climber: Pip, Frostbite, Gloop, Obsidian and Starling. Picked with the arrows beside the logo (the logo shows the pick). Cosmetic only; each run stores its look so replays show it.
+- [x] Tilt steering on phones was already there (the Tilt switch on the title screen). It's now also in the pause menu, says so when the phone refuses it, and the how-to explains it.
+- [x] `scripts/musiccheck.mjs` walks the screens headless and checks the music follows; `tests/songs.test.ts` checks every song's patterns.
+
 ## Later ideas (not agreed)
 
 - More hazards per zone.
-- Cosmetics for the character unlocked by height milestones.
+- More looks, maybe unlocked by height milestones (five are free to pick now).
 - Height achievements and a stats page (total meters climbed, enemies squashed).
 - Name filter or an admin way to hide a board entry.
 - Install as an app (PWA) and offline play.

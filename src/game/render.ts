@@ -82,23 +82,84 @@ function sprite(rows: string[], pal: Record<string, string>): HTMLCanvasElement 
   return c;
 }
 
-const EMBER_PAL = { o: '#7a1e0c', y: '#ffc23a', r: '#ff7a1e', h: '#fff0a0' };
-const EMBER = sprite(
-  [
-    '....ooooo....',
-    '..ooyyyyyoo..',
-    '.oyhhyyyyyyo.',
-    'oyyhyyyyyyyyo',
-    'oyyyyyyyyyyyo',
-    'oyyyyyyyyyyyo',
-    'oyyyyyyyyyyyo',
-    'orryyyyyyyrro',
-    '.orrrrrrrrro.',
-    '..oorrrrroo..',
-    '....ooooo....',
-  ],
-  EMBER_PAL,
-);
+const EMBER_ROWS = [
+  '....ooooo....',
+  '..ooyyyyyoo..',
+  '.oyhhyyyyyyo.',
+  'oyyhyyyyyyyyo',
+  'oyyyyyyyyyyyo',
+  'oyyyyyyyyyyyo',
+  'oyyyyyyyyyyyo',
+  'orryyyyyyyrro',
+  '.orrrrrrrrro.',
+  '..oorrrrroo..',
+  '....ooooo....',
+];
+
+// ---------- Skins: the climber's looks. Cosmetic only; the sim never sees them. ----------
+
+export interface Skin {
+  name: string;
+  /** Outline, body, lower body, highlight. */
+  pal: { o: string; y: string; r: string; h: string };
+  /** Flame (or top) colors: inner, outer. Also the spark trail. */
+  flame: [string, string];
+  /** A finishing touch drawn over the body. */
+  extra: 'none' | 'frost' | 'drip' | 'cracks' | 'star';
+  sprite: HTMLCanvasElement;
+}
+
+function skin(name: string, pal: Skin['pal'], flame: Skin['flame'], extra: Skin['extra']): Skin {
+  return { name, pal, flame, extra, sprite: sprite(EMBER_ROWS, pal) };
+}
+
+/** In picker order. The index is what's saved and sent with a run. */
+export const SKINS: Skin[] = [
+  skin('Pip', { o: '#7a1e0c', y: '#ffc23a', r: '#ff7a1e', h: '#fff0a0' }, ['#ffc23a', '#ff7a1e'], 'none'),
+  skin('Frostbite', { o: '#1d4a7a', y: '#d8f4ff', r: '#7fc4e6', h: '#ffffff' }, ['#e8fbff', '#6fd0ff'], 'frost'),
+  skin('Gloop', { o: '#1f5a1a', y: '#8ee04a', r: '#4fa83a', h: '#e0ffb0' }, ['#c8ff6a', '#6ad02a'], 'drip'),
+  skin('Obsidian', { o: '#000000', y: '#2e2536', r: '#1a141e', h: '#6a5a78' }, ['#ffb02e', '#f0541a'], 'cracks'),
+  skin('Starling', { o: '#4a1a6a', y: '#e7a4ff', r: '#b45cf0', h: '#fff0ff' }, ['#fff3b0', '#ffd84a'], 'star'),
+];
+
+export const skinAt = (i: number) => SKINS[i >= 0 && i < SKINS.length ? Math.floor(i) : 0] ?? SKINS[0];
+
+type Px = (x: number, y: number, w: number, h: number, c: string) => void;
+
+/** A skin's finishing touch over the body. `left`, `top`: the body sprite's corner; `h`: its drawn height. */
+function skinExtra(px: Px, s: Skin, left: number, top: number, h: number, time: number): void {
+  switch (s.extra) {
+    case 'frost':
+      px(left + 3, top + h, 1, 1, '#e8fbff');
+      px(left + 9, top + h, 1, 2, '#e8fbff');
+      if (Math.floor(time * 3) % 3 === 0) px(left + 10, top + 2, 1, 1, '#ffffff');
+      break;
+    case 'drip': {
+      const len = Math.floor(((time * 1.5) % 1) * 4);
+      px(left + 4, top + h - 1, 1, 1 + len, s.pal.r);
+      px(left + 9, top + h - 1, 1, 1 + ((len + 2) % 4), s.pal.r);
+      break;
+    }
+    case 'cracks': {
+      const glow = Math.floor(time * 4) % 2 ? '#ffb02e' : '#ff7a1e';
+      px(left + 1, top + 7, 1, 1, glow);
+      px(left + 2, top + 8, 1, 1, glow);
+      px(left + 11, top + 6, 1, 1, glow);
+      px(left + 10, top + 7, 1, 1, glow);
+      px(left + 6, top + 9, 2, 1, '#f0541a');
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+/** A star in place of the flame (Starling). `cx`: center column; `top`: the body's top row. */
+function skinStar(px: Px, s: Skin, cx: number, top: number, time: number): void {
+  px(cx - 1, top - 3, 3, 1, s.flame[0]);
+  px(cx, top - 4, 1, 3, s.flame[0]);
+  if (Math.floor(time * 5) % 4 === 0) px(cx + 2, top - 5, 1, 1, '#ffffff');
+}
 
 /** The ember's shape in ghostly blue, for the Daily Climb ghost. */
 const GHOST = sprite(
@@ -192,6 +253,8 @@ const DRIPS = [7, 19, 43, 31];
  * The canvas is shown blown up with `image-rendering: pixelated`.
  */
 export class Logo {
+  /** The climber in the O: whichever skin is picked. */
+  skin: Skin = SKINS[0];
   private g: CanvasRenderingContext2D;
   /** Letter pixels, and the dark outline around them, worked out once. */
   private fill: Uint8Array;
@@ -285,17 +348,23 @@ export class Logo {
     const lift = Math.round(air * 10);
     const squash = ph < 0.08 || ph > 0.94;
     const top = floor - 11 - lift + (squash ? 1 : 0);
-    g.drawImage(EMBER, ox, top, 13, squash ? 10 : 11);
+    const s = this.skin;
+    const h = squash ? 10 : 11;
+    g.drawImage(s.sprite, ox, top, 13, h);
+    skinExtra(px, s, ox, top, h, time);
     // Eyes, looking up on the way up.
     for (const e of [3, 8]) {
       px(ox + e, top + 4, 2, 3, '#ffffff');
       px(ox + e + 1, top + 4 + (ph < 0.5 ? 0 : 1), 1, 2, '#2a0d12');
     }
-    // Flame hair that flickers.
-    const fl = Math.floor(time * 12) % 2;
-    px(ox + 5, top - 1, 3, 1, EMBER_PAL.y);
-    px(ox + 6 - fl, top - 2, 2, 1, EMBER_PAL.y);
-    px(ox + 6 + fl, top - 3, 1, 1, EMBER_PAL.r);
+    // Flame hair that flickers, or Starling's star.
+    if (s.extra === 'star') skinStar(px, s, ox + 6, top, time);
+    else {
+      const fl = Math.floor(time * 12) % 2;
+      px(ox + 5, top - 1, 3, 1, s.flame[0]);
+      px(ox + 6 - fl, top - 2, 2, 1, s.flame[0]);
+      px(ox + 6 + fl, top - 3, 1, 1, s.flame[1]);
+    }
     if (squash) {
       px(ox - 3, floor - 1, 2, 1, LAVA[0]);
       px(ox + 14, floor - 1, 2, 1, LAVA[0]);
@@ -331,6 +400,8 @@ export class Renderer {
   /** Calm effects: no screen flashes, no shake, no blinking warnings. */
   calm = false;
   ghost: Ghost | null = null;
+  /** The climber's look. */
+  skin: Skin = SKINS[0];
 
   constructor(readonly canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d')!;
@@ -1020,7 +1091,7 @@ export class Renderer {
     if (sim.vy > 4 && Math.random() < 0.5 * k) {
       this.particles.push({
         x: px + (Math.random() - 0.5) * 12, y: py + 4, vx: 0, vy: -0.5, life: 0, max: 14 + Math.random() * 10,
-        color: riding && sim.ride === PickupKind.Geyser ? '#dff6ff' : '#ff9a3c', size: 1, grav: 0,
+        color: riding && sim.ride === PickupKind.Geyser ? '#dff6ff' : this.skin.flame[1], size: 1, grav: 0,
       });
     }
     // Blink while the grace period runs out.
@@ -1043,12 +1114,14 @@ export class Renderer {
       const bh = 11 - (wide > 0 ? wide + 1 : wide);
       const left = cx - 6 - wide;
       const top = feet - 1 - bh;
-      b.drawImage(EMBER, left, top, bw, bh);
+      const s = this.skin;
+      b.drawImage(s.sprite, left, top, bw, bh);
+      skinExtra((x, y, w, h, c) => this.r(x, y, w, h, c), s, left, top, bh, t);
       // Feet tuck in on the way up.
       if (wide <= 0) {
         const fy = feet - 1 - (sim.vy > 2 ? 1 : 0);
-        this.r(cx - 4, fy, 2, 1, EMBER_PAL.o);
-        this.r(cx + 2, fy, 2, 1, EMBER_PAL.o);
+        this.r(cx - 4, fy, 2, 1, s.pal.o);
+        this.r(cx + 2, fy, 2, 1, s.pal.o);
       }
       // Eyes look where you're steering, and up or down with the motion.
       const ey = top + 4 - (wide > 0 ? 1 : 0);
@@ -1058,13 +1131,16 @@ export class Renderer {
         this.r(exx, ey, 2, 3, '#ffffff');
         this.r(exx + (this.face > 0 ? 1 : 0), ey + look, 1, 2, '#2a0d12');
       }
-      // The flame leans away from where you're going and stretches when you fall.
-      const lean = Math.max(-2, Math.min(2, sim.vx / 3));
-      const len = sim.vy < -4 ? 5 : sim.vy > 6 ? 2 : 3;
-      for (let i = 0; i < len; i++) {
-        const fx = cx - Math.round(lean * i * 0.6) + (i > 0 && Math.floor(t * 14 + i) % 2 ? 1 : 0);
-        const fw = i === 0 ? 3 : i < 3 ? 2 : 1;
-        this.r(fx - Math.floor(fw / 2), top - 1 - i, fw, 1, i < 2 ? EMBER_PAL.y : EMBER_PAL.r);
+      // The flame leans away from where you're going and stretches when you fall. Starling has a star.
+      if (s.extra === 'star') skinStar((x, y, w, h, c) => this.r(x, y, w, h, c), s, cx, top, t);
+      else {
+        const lean = Math.max(-2, Math.min(2, sim.vx / 3));
+        const len = sim.vy < -4 ? 5 : sim.vy > 6 ? 2 : 3;
+        for (let i = 0; i < len; i++) {
+          const fx = cx - Math.round(lean * i * 0.6) + (i > 0 && Math.floor(t * 14 + i) % 2 ? 1 : 0);
+          const fw = i === 0 ? 3 : i < 3 ? 2 : 1;
+          this.r(fx - Math.floor(fw / 2), top - 1 - i, fw, 1, i < 2 ? s.flame[0] : s.flame[1]);
+        }
       }
       const mid = top + 5;
       if (riding && sim.ride === PickupKind.Bubble) {

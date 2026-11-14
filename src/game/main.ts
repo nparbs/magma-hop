@@ -319,11 +319,16 @@ async function startGame(kind: 'endless' | 'daily' = lastKind): Promise<void> {
   ui.board.classList.add('hidden');
   let r: RunTicket | null;
   if (kind === 'daily') {
-    r = await ticket(true).catch(() => null);
+    let why = '';
+    r = await ticket(true).catch((e) => {
+      why = String((e as Error)?.message ?? e);
+      return null;
+    });
     if (!r?.day) {
       starting = false;
-      ui.dailyNote.textContent = "The Daily Climb needs the board, and it's offline right now";
-      if (mode === 'over') ui.rank.textContent = "The Daily Climb needs the board, and it's offline right now.";
+      const msg = `Can't start the Daily Climb: the board ${why ? `said "${why}"` : "isn't answering"}. Try again in a moment.`;
+      ui.dailyNote.textContent = msg;
+      if (mode === 'over') ui.rank.textContent = msg;
       return;
     }
   } else r = await takeRun();

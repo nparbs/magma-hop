@@ -147,9 +147,25 @@ function validLog(log: unknown, ticks: number): log is number[] {
 
 const token = (v: unknown) => typeof v === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(v);
 
+/**
+ * POSTs must come from our own page: either the address this request was sent to (same origin,
+ * whatever hostname the tunnel serves us under) or one listed in ALLOWED_ORIGINS. Other sites are refused.
+ */
+function originOk(req: http.IncomingMessage): boolean {
+  const origin = req.headers.origin;
+  if (!origin || !ALLOWED.length) return true;
+  if (ALLOWED.includes(origin)) return true;
+  try {
+    return new URL(origin).host === req.headers.host;
+  } catch {
+    return false;
+  }
+}
+
 async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL): Promise<void> {
   const ip = clientIp(req);
-  if (req.method === 'POST' && ALLOWED.length && !ALLOWED.includes(String(req.headers.origin ?? ''))) {
+  if (req.method === 'POST' && !originOk(req)) {
+    console.warn(`refused POST ${url.pathname} from origin ${req.headers.origin} (host ${req.headers.host})`);
     send(res, 403, { error: 'origin' });
     return;
   }

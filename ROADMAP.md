@@ -60,7 +60,7 @@ Tuning and checks
 - [x] Route, replay, lava, crumble and ride tests.
 - [x] The title-screen bot now picks ledges it can still land on. Without hazards it climbs 1.4 to 5.9 km before it falls.
 - [x] The run-over screen says what ended the run.
-- [ ] Nobody has played it by hand yet. Every number is still a first guess.
+- [x] The owner has played it live since 2026-11-14. First note: too many ledges early on (fixed in v0.3.2).
 
 Look
 
@@ -84,15 +84,15 @@ All of these can be drawn in code. Each one says what is below you, because fall
 
 Claude's pick is **B, Volcano escape**: the rising lava explains the new falling rule at a glance, and pixel art on a dark background reads well at 640x360. C is the cheapest to build and pairs best with the planned music. E would want a new name.
 
-## Before going live
+## Going live (2026-11-14)
 
-- [ ] Owner playtest of v0.2: bounce height, steering speed, how forgiving the first 700 m are, how often rides and shells turn up. All numbers are first guesses (`src/sim/sim.ts` top, `src/sim/zones.ts`).
-- [ ] Owner listen of the v0.3 music (nobody has heard it yet; the loops are in `src/game/audio.ts`, `SONGS`).
-- [ ] Merge `v0.2-bouncer` and `v0.3` once the owner is happy with them.
-- [ ] VM setup and the Cloudflare hostname (docs/hosting.md).
+- [x] v0.2 and v0.3 merged to main; repo renamed to nparbs/magma-hop and made public.
+- [x] VM container, locked deploy key and the Cloudflare hostname: live at https://magmahop.parbs.online.
+- [ ] Owner feedback on the feel: bounce height, steering speed, how often rides and shells turn up. Tuning numbers are at the top of `src/sim/sim.ts` and in `src/sim/zones.ts`.
+- [ ] Owner listen of the music (the songs are in `src/game/songs.ts`).
 - [ ] Add Magma Hop to the parbs.online landing page.
 
-## v0.3 — feel and fairness (built, on branch `v0.3`)
+## v0.3 — feel and fairness (live)
 
 No rule changes, so `SIM_VERSION` stays 2 and v0.2 runs can still be watched.
 
@@ -102,9 +102,14 @@ No rule changes, so `SIM_VERSION` stays 2 and v0.2 runs can still be watched.
 - [x] Ghost: in the Daily Climb, your best try today races you as a blue ember. With no try yet, you race the day's #1. (A ghost only works on the same seed, so endless runs don't have one.)
 - [x] Watch the top runs: ▶ beside a name on any board plays that climb back, at 1×, 2× or 4×.
 - [x] Fixed: the board opened behind the run-over screen.
-- [ ] Tuning pass from playtests: hazard density, crumble and fake rates, wind strength. Waits for the owner's playtest.
+- [ ] Tuning pass from playtests: hazard density, crumble and fake rates, wind strength. Waits for more of the owner's play.
 
-## v0.4 — music and looks (built, 2026-11-14)
+Fixes after going live:
+
+- [x] v0.3.1: the server took runs only from one exact address, so under any other hostname runs went unranked and the Daily Climb couldn't start. It now accepts its own page's address and still refuses other sites.
+- [x] v0.3.2: fewer ledges early on, and route ledges never crumble or fake, so there's always a way up (see the decisions table). `SIM_VERSION` 3.
+
+## v0.4 — music and looks (live, 2026-11-14)
 
 Asked for by the owner after playing v0.3 live.
 

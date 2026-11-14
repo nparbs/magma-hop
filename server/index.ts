@@ -1,0 +1,231 @@
+// Serves the page and the height board. Every run is replayed here before it counts.
+
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import { randomBytes, randomInt } from 'node:crypto';
+import { Store, playerKey, weekStart } from './db';
+import { INPUT_MAX, TICK_RATE, replay } from '../src/sim/sim';
+import { cleanName } from '../src/sim/names';
+
+declare const __APP_VERSION__: string;
+
+const PORT = Number(process.env.PORT ?? 8794);
+const STATIC_DIR = path.resolve(process.env.STATIC_DIR ?? 'dist');
+const DB_FILE = process.env.DB_FILE ?? 'data/updraft.db';
+const ALLOWED = (process.env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+const IP_HEADER = (process.env.CLIENT_IP_HEADER ?? '').toLowerCase();
+
+/** Two hours of climbing is the longest run the board takes. */
+const MAX_TICKS = TICK_RATE * 60 * 120;
+const MAX_LOG = 60_000;
+const RUN_TTL = 3 * 3600_000;
+const MAX_PENDING = 20_000;
+
+const store = new Store(DB_FILE);
+const pending = new Map<string, { seed: number; issued: number }>();
+
+const MIME: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.webmanifest': 'application/manifest+json',
+};
+
+function serveStatic(req: http.IncomingMessage, res: http.ServerResponse): void {
+  const url = new URL(req.url ?? '/', 'http://x');
+  let rel = decodeURIComponent(url.pathname);
+  if (rel.endsWith('/')) rel += 'index.html';
+  const file = path.resolve(STATIC_DIR, '.' + rel);
+  if (!file.startsWith(STATIC_DIR + path.sep)) {
+    res.writeHead(403).end();
+    return;
+  }
+  fs.stat(file, (err, st) => {
+    if (err || !st.isFile()) {
+      res.writeHead(404, { 'content-type': 'text/plain' }).end('Not found');
+      return;
+    }
+    const hashed = rel.startsWith('/assets/');
+    res.writeHead(200, {
+      'content-type': MIME[path.extname(file)] ?? 'application/octet-stream',
+      'content-length': st.size,
+      'cache-control': hashed ? 'public, max-age=31536000, immutable' : 'no-cache',
+      'x-content-type-options': 'nosniff',
+      'referrer-policy': 'same-origin',
+    });
+    if (req.method === 'HEAD') res.end();
+    else fs.createReadStream(file).pipe(res);
+  });
+}
+
+// ---------- Rate limits: a few tokens per IP that refill each minute ----------
+
+const buckets = new Map<string, { n: number; at: number }>();
+function allow(key: string, perMinute: number): boolean {
+  const now = Date.now();
+  const b = buckets.get(key);
+  if (!b || now - b.at > 60_000) {
+    buckets.set(key, { n: 1, at: now });
+    return true;
+  }
+  if (b.n >= perMinute) return false;
+  b.n++;
+  return true;
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, b] of buckets) if (now - b.at > 60_000) buckets.delete(k);
+  for (const [k, r] of pending) if (now - r.issued > RUN_TTL) pending.delete(k);
+}, 60_000).unref();
+
+function clientIp(req: http.IncomingMessage): string {
+  if (IP_HEADER) {
+    const v = req.headers[IP_HEADER];
+    if (typeof v === 'string' && v) return v.split(',')[0].trim();
+  }
+  return req.socket.remoteAddress ?? '?';
+}
+
+function send(res: http.ServerResponse, status: number, body: unknown): void {
+  res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+  res.end(JSON.stringify(body));
+}
+
+function readJson(req: http.IncomingMessage, limit: number): Promise<any> {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks: Buffer[] = [];
+    req.on('data', (c: Buffer) => {
+      size += c.length;
+      if (size > limit) {
+        reject(new Error('too big'));
+        req.destroy();
+      } else chunks.push(c);
+    });
+    req.on('end', () => {
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+      } catch {
+        reject(new Error('bad json'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+function validLog(log: unknown, ticks: number): log is number[] {
+  if (!Array.isArray(log) || log.length % 2 !== 0 || log.length > MAX_LOG) return false;
+  let last = 0;
+  for (let i = 0; i < log.length; i += 2) {
+    const t = log[i];
+    const v = log[i + 1];
+    if (!Number.isInteger(t) || t <= last || t > ticks) return false;
+    if (!Number.isInteger(v) || v < -INPUT_MAX || v > INPUT_MAX) return false;
+    last = t;
+  }
+  return true;
+}
+
+const token = (v: unknown) => typeof v === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(v);
+
+async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL): Promise<void> {
+  const ip = clientIp(req);
+  if (req.method === 'POST' && ALLOWED.length && !ALLOWED.includes(String(req.headers.origin ?? ''))) {
+    send(res, 403, { error: 'origin' });
+    return;
+  }
+
+  if (url.pathname === '/api/start' && req.method === 'POST') {
+    if (!allow('start:' + ip, 40)) return send(res, 429, { error: 'slow down' });
+    if (pending.size >= MAX_PENDING) pending.delete(pending.keys().next().value!);
+    const runId = randomBytes(12).toString('base64url');
+    const seed = randomInt(1, 2 ** 31);
+    pending.set(runId, { seed, issued: Date.now() });
+    return send(res, 200, { runId, seed });
+  }
+
+  if (url.pathname === '/api/finish' && req.method === 'POST') {
+    if (!allow('finish:' + ip, 12)) return send(res, 429, { error: 'slow down' });
+    let body: any;
+    try {
+      body = await readJson(req, 512 * 1024);
+    } catch {
+      return send(res, 400, { error: 'bad request' });
+    }
+    const run = typeof body?.runId === 'string' ? pending.get(body.runId) : undefined;
+    if (!run) return send(res, 404, { error: 'unknown run' });
+    pending.delete(body.runId);
+    const ticks = body.ticks;
+    if (!token(body.player) || !Number.isInteger(ticks) || ticks < 1 || ticks > MAX_TICKS || !validLog(body.log, ticks)) {
+      return send(res, 400, { error: 'bad run' });
+    }
+    // Real time must have passed: a run can't be played faster than 60 ticks a second.
+    const minMs = (ticks / TICK_RATE) * 1000 * 0.9 - 3000;
+    if (Date.now() - run.issued < minMs) return send(res, 400, { error: 'too fast' });
+
+    const r = replay(run.seed, body.log, ticks);
+    if (r.ticks !== ticks) return send(res, 400, { error: 'replay mismatch' });
+    if (Number(body.meters) !== r.meters) console.warn(`replay height differs: claimed ${body.meters}, replayed ${r.meters}`);
+
+    const player = playerKey(body.player);
+    const name = cleanName(body.name);
+    const week = weekStart();
+    if (r.meters > 0) store.add({ player, name, meters: r.meters, ticks, cause: r.cause || 'quit', seed: run.seed, log: body.log });
+    return send(res, 200, {
+      meters: r.meters,
+      best: store.best(player, 0) ?? r.meters,
+      rank: store.rank(player, r.meters, 0),
+      weekBest: store.best(player, week) ?? r.meters,
+      weekRank: store.rank(player, r.meters, week),
+    });
+  }
+
+  if (url.pathname === '/api/board' && req.method === 'GET') {
+    if (!allow('board:' + ip, 60)) return send(res, 429, { error: 'slow down' });
+    const since = url.searchParams.get('range') === 'week' ? weekStart() : 0;
+    const top = store.top(since, 50);
+    const me = url.searchParams.get('player');
+    let mine = null;
+    if (token(me)) {
+      const key = playerKey(me!);
+      const best = store.best(key, since);
+      if (best !== null) mine = { meters: best, rank: store.rank(key, best, since) };
+    }
+    return send(res, 200, { top, me: mine, weekStart: weekStart() });
+  }
+
+  send(res, 404, { error: 'not found' });
+}
+
+const server = http.createServer((req, res) => {
+  const url = new URL(req.url ?? '/', 'http://x');
+  if (url.pathname === '/health') {
+    return send(res, 200, { ok: true, version: __APP_VERSION__, climbers: store.climbers(), pending: pending.size });
+  }
+  if (url.pathname.startsWith('/api/')) {
+    api(req, res, url).catch((e) => {
+      console.error(e);
+      if (!res.headersSent) send(res, 500, { error: 'server' });
+    });
+    return;
+  }
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    res.writeHead(405).end();
+    return;
+  }
+  serveStatic(req, res);
+});
+
+server.listen(PORT, () => {
+  console.log(`Updraft v${__APP_VERSION__} on :${PORT}, static from ${STATIC_DIR}, ${store.climbers()} climbers`);
+});
+
+for (const sig of ['SIGINT', 'SIGTERM'] as const) process.on(sig, () => server.close(() => process.exit(0)));

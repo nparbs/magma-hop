@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#1c1440" />
+    <meta name="description" content="Bounce up an endless sky tower. Steer left and right, dodge drones and lightning, and climb the height board." />
+    <title>Updraft</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1440'/%3E%3Ccircle cx='32' cy='28' r='15' fill='%23ffb347' stroke='%237a3f12' stroke-width='3'/%3E%3Crect x='22' y='21' width='20' height='12' rx='6' fill='%2320253a'/%3E%3Ccircle cx='36' cy='27' r='4' fill='%237dfcc6'/%3E%3Cpath d='M24 46 l6 4 l-6 4 l6 4' stroke='%23c7cbe0' stroke-width='3' fill='none'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+
+    <div id="hud" class="hidden">
+      <div class="hud-left">
+        <div id="hHeight" class="height">0 m</div>
+        <div id="hSub" class="sub"></div>
+        <div id="hWind" class="wind hidden"></div>
+      </div>
+      <button id="pauseBtn" class="icon-btn" aria-label="Pause">❚❚</button>
+      <div id="banner" class="banner"></div>
+      <div id="toast" class="toast"></div>
+      <div id="touchHint" class="touch-hint hidden"><span>◀ hold</span><span>hold ▶</span></div>
+    </div>
+
+    <section id="title" class="panel-wrap">
+      <div class="panel title-panel">
+        <h1 class="logo">UP<span>DRAFT</span></h1>
+        <p class="tag">Bounce up the endless sky tower. How high can you get?</p>
+        <label class="name-row">
+          <span>Your name on the board</span>
+          <input id="nameInput" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Climber" />
+        </label>
+        <button id="playBtn" class="big-btn">Climb</button>
+        <div class="row">
+          <button id="boardBtn" class="btn">Height board</button>
+          <button id="howBtn" class="btn">How to play</button>
+        </div>
+        <div class="row small">
+          <button id="soundBtn" class="chip">Sound on</button>
+          <button id="tiltBtn" class="chip hidden">Tilt off</button>
+        </div>
+        <div id="miniBoard" class="mini-board"></div>
+        <div id="ver" class="ver"></div>
+      </div>
+    </section>
+
+    <section id="how" class="panel-wrap hidden">
+      <div class="panel">
+        <h2>How to play</h2>
+        <ul class="how">
+          <li><b>You bounce by yourself.</b> Land on a ledge and you spring up again.</li>
+          <li><b>Steer left and right:</b> ← → or A / D, a gamepad, or hold the left or right half of the screen. Phones can use tilt too.</li>
+          <li><b>The edges wrap.</b> Go off one side and you come back on the other.</li>
+          <li><b>No checkpoints.</b> Miss and you fall onto whatever is below. Your score is the highest point you reached, so a fall only costs time.</li>
+          <li><b>One hit ends the run.</b> Drones, lightning and space junk. You can squash a drone by landing on it from above.</li>
+          <li><b>It gets harder as you climb:</b> smaller ledges, bigger gaps, drifting and crumbling ledges, fakes with a faint dotted underside, wind gusts (watch the arrow), ice, and springs for a big boost.</li>
+        </ul>
+        <button class="btn close">Got it</button>
+      </div>
+    </section>
+
+    <section id="board" class="panel-wrap hidden">
+      <div class="panel">
+        <h2>Height board</h2>
+        <div class="tabs">
+          <button class="tab active" data-range="all">All time</button>
+          <button class="tab" data-range="week">This week</button>
+        </div>
+        <ol id="boardList" class="board-list"></ol>
+        <div id="boardMe" class="board-me"></div>
+        <button class="btn close">Close</button>
+      </div>
+    </section>
+
+    <section id="pause" class="panel-wrap hidden">
+      <div class="panel">
+        <h2>Paused</h2>
+        <button id="resumeBtn" class="big-btn">Resume</button>
+        <button id="endBtn" class="btn">End run here</button>
+      </div>
+    </section>
+
+    <section id="over" class="panel-wrap hidden">
+      <div class="panel">
+        <div id="oCause" class="cause"></div>
+        <div id="oMeters" class="meters"></div>
+        <div id="oBest" class="best"></div>
+        <div id="oRank" class="rank"></div>
+        <button id="againBtn" class="big-btn">Climb again</button>
+        <div class="row">
+          <button id="oBoardBtn" class="btn">Height board</button>
+          <button id="menuBtn" class="btn">Menu</button>
+        </div>
+      </div>
+    </section>
+
+    <script type="module" src="/src/game/main.ts"></script>
+  </body>
+</html>

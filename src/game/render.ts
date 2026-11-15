@@ -739,6 +739,7 @@ export class Renderer {
     b.restore();
 
     this.drawLava(sim);
+    this.drawTideLine(sim);
     this.drawSides(zM);
 
     // Blow the buffer up onto the screen.
@@ -959,6 +960,34 @@ export class Renderer {
       if (ph < 0.85) this.ring(x, top + 4, rad, LV[0]);
       else for (let s = 0; s < 4; s++) this.r(x + (s - 1.5) * 3, top - 2 - (ph - 0.85) * 30, 1, 1, LV[0]);
     }
+  }
+
+  /**
+   * Tide line: during a rumble and the rise, a dashed glowing line where the surge will stop
+   * (it follows your best height, as the lava will). Gone once the lava gets there.
+   */
+  private drawTideLine(sim: Sim): void {
+    if (sim.dead || (sim.surge !== 'rumble' && sim.surge !== 'rise')) return;
+    const y = this.ay(sim.maxY - sim.surgeMin);
+    const top = this.ay(this.lava);
+    if (y >= top - 3 || y < 0) return;
+    const { b } = this;
+    // Fades in over the rumble's first half second; pulses unless calm effects are on.
+    const fade = sim.surge === 'rumble' ? clamp01(sim.surgeTick / 30) : 1;
+    const pulse = this.calm ? 0.8 : 0.65 + 0.35 * Math.sin(this.time * 9);
+    b.globalAlpha = 0.25 * fade;
+    this.r(this.ox, y + 2, COL, 5, '#ff7a1e');
+    b.globalAlpha = fade * pulse;
+    const off = this.calm ? 0 : Math.floor(this.time * 8) % 8;
+    for (let x = this.ox - off; x < this.ox + COL; x += 8) {
+      const x0 = Math.max(this.ox, x);
+      const w = Math.min(x + 5, this.ox + COL) - x0;
+      if (w > 0) {
+        this.r(x0, y, w, 1, '#fff2c0');
+        this.r(x0, y + 1, w, 1, '#ff9a3c');
+      }
+    }
+    b.globalAlpha = 1;
   }
 
   /** Dim what's beside the shaft and mark the edges you wrap through. */

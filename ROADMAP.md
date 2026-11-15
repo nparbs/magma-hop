@@ -175,12 +175,18 @@ Owner playtest, 2026-11-15: surges and the early bats were too punishing. Make t
 
 Ideas that would make deaths feel fairer without making the game easier.
 
-- **Tide line.** During a rumble, draw a faint glowing line where the lava will stop, so you know how high you need to be. Display only, no rule change.
 - **Lava gauge.** A thin bar up the side of the screen showing how close the lava is, so you notice it before it's on screen.
 - **Bat tells.** Bats squeak and flash once the first time they come on screen, and early bats hang asleep until you're near. You'd still have to stomp them from above.
 - **"What got you" replay.** On the run-over screen, a 2-second replay of the moment you died. Laury tells you how to avoid it next time ("bats only fold when you land on them from above").
 - **Practice from a zone.** Once you've reached a zone, you can start a practice run there. It isn't ranked and has no board, so the board stays fair.
 - **Shell on the HUD.** A small shell icon while you're carrying one, and a "Shell saved you" pop when it breaks.
+
+## v0.7.2 — tide line (live since 2026-11-15)
+
+The owner picked this from Claude's suggestions on 2026-11-15, and said the v0.7.1 surge numbers are about right.
+
+- [x] **Tide line.** From the rumble until the lava gets there, a dashed glowing line marks where the surge will stop. It follows your best height, just as the lava will. It fades in over half a second and pulses (steady with calm effects). Display only, no sim change.
+- [ ] Owner playtest. On phones, Laury's rumble line can cover the left end of the tide line.
 
 ## Later ideas (not agreed)
 

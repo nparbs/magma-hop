@@ -1,6 +1,6 @@
 # Handoff
 
-Last updated 2026-11-15. Live is **v0.7.2** (commit d397730). Read ROADMAP.md for the plan and the decisions the owner has made, CLAUDE.md for the working rules, and docs/hosting.md for the server.
+Last updated 2026-11-15. Live is **v0.8.0** (commit 8576d6d): the guide renamed Laury → Ash (code keeps `laury` names), rarer during runs (`lauryChat` in `main.ts`) with a babble voice (`Sfx.voice`), her bubble top right and tutorial buttons mid-right, and 18 more songs with B sections (`onPass` in `songs.ts`, shuffle bags in `Music.pick`). See ROADMAP.md v0.8.0; nobody has heard the new songs or the voice yet. Read ROADMAP.md for the plan and the decisions the owner has made, CLAUDE.md for the working rules, and docs/hosting.md for the server.
 
 ## v0.7.1 (gentler start) and v0.7.2 (tide line), live since 2026-11-15
 

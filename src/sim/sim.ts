@@ -4,10 +4,10 @@
 // Units: x runs 0..WIDTH and wraps. y points UP, 0 is the chamber floor. 10 units = 1 meter. 60 ticks a second.
 
 import { Rng, hash32, hashFrac } from './rng';
-import { FEATURE, difficulty, rockfallOn, windStrength } from './zones';
+import { CRUST_ZONE, DAILY_SPAN, FEATURE, difficulty, rockfallOn, windStrength, zoneIndexAt } from './zones';
 
 /** Bump this whenever a rule changes: stored input logs only replay under the version that made them. */
-export const SIM_VERSION = 3;
+export const SIM_VERSION = 4;
 
 export const WIDTH = 420;
 export const UNITS_PER_METER = 10;
@@ -48,6 +48,47 @@ export const GRACE_TICKS = 50;
 /** Input is an integer -4..4: keyboard gives ±4, tilt gives the steps between. */
 export const INPUT_MAX = 4;
 
+// Eruption surges: past seeded heights the lava rumbles, then surges up close behind you and eases off.
+/** First surge height, meters: somewhere in [SURGE_FIRST, SURGE_FIRST + SURGE_FIRST_SPREAD). */
+export const SURGE_FIRST = 260;
+export const SURGE_FIRST_SPREAD = 50;
+/** Gap to the next surge, meters: about 250 low down, shrinking toward SURGE_GAP_MIN. */
+export const SURGE_GAP_MIN = 120;
+/** Phase lengths, ticks. */
+export const SURGE_RUMBLE = 120;
+export const SURGE_RISE = 80;
+export const SURGE_HOLD = 60;
+export const SURGE_EASE = 300;
+/**
+ * How close the lava gets during a surge. Never closer than the biggest route gap at that height
+ * (plus a margin), so there is always a route ledge in reach above the lava: 120 low down, about 157 at 3 km.
+ */
+export const SURGE_LIMIT = 120;
+
+export type SurgePhase = 'none' | 'rumble' | 'rise' | 'hold' | 'ease';
+
+/** Crust ledges: this many bounces and the third one melts it (you still get the bounce). */
+export const CRUST_BOUNCES = 3;
+/** Ticks a melted crust takes to form again, heat reset. */
+export const CRUST_REFORM = 180;
+
+/** Daily Climb summit, meters: a multiple of 10 in 1,200..2,000, from the seed. */
+export function summitMeters(seed: number): number {
+  return 1200 + 10 * (hash32(seed >>> 0, 77) % 81);
+}
+
+/** Meters of the gap after a surge at `m` (before the seeded jitter). */
+export function surgeGap(m: number): number {
+  return SURGE_GAP_MIN + 150 * (1 - difficulty(m));
+}
+
+/** The closest the lava comes during a surge that starts at `m` meters. */
+export function surgeLimit(m: number): number {
+  const d = difficulty(m);
+  const widest = Math.min(MAX_GAP, 0.45 + 0.42 * d) * APEX;
+  return Math.max(SURGE_LIMIT, widest + 15);
+}
+
 const BUCKET = 200;
 
 export enum Kind {
@@ -55,6 +96,8 @@ export enum Kind {
   Crumble = 1,
   Ice = 2,
   Fake = 3,
+  /** Solid twice; the third bounce melts it for CRUST_REFORM ticks. */
+  Crust = 4,
 }
 
 export interface Platform {
@@ -74,8 +117,14 @@ export interface Platform {
   spring: number | null;
   /** Tick it broke, or -1. Crumbling and fake ledges break for good. */
   broken: number;
+  /** Crust: bounces taken since it last formed (0..CRUST_BOUNCES). Always 0 for other kinds. */
+  heat: number;
+  /** Crust: tick it melted, or -1 while solid. It forms again CRUST_REFORM ticks later. */
+  melt: number;
   /** Part of the guaranteed route up (used by tests and the bot). */
   path: boolean;
+  /** The full-width ledge at the Daily Climb summit. */
+  summit?: boolean;
 }
 
 export enum HazardKind {
@@ -129,11 +178,21 @@ export type SimEvent =
   | { t: 'shieldbreak'; x: number; y: number }
   | { t: 'strike'; x: number; y: number }
   | { t: 'warn'; x: number; y: number }
-  | { t: 'die'; x: number; y: number; cause: string };
+  | { t: 'die'; x: number; y: number; cause: string }
+  /** A crust ledge melted under its third bounce, or formed again. */
+  | { t: 'melt'; x: number; y: number; w: number }
+  | { t: 'reform'; x: number; y: number; w: number }
+  /** An eruption surge: the warning rumble starts, then (SURGE_RUMBLE ticks later) the lava starts rising. */
+  | { t: 'rumble'; y: number }
+  | { t: 'surge'; y: number }
+  /** Daily Climb won: the run ends here with cause 'summit'. */
+  | { t: 'summit'; x: number; y: number; ticks: number };
 
 export interface SimOptions {
   /** Tests switch hazards off to check the route alone. */
   hazards?: boolean;
+  /** A Daily Climb run: it has a summit, and the zones are squeezed to fit below it. */
+  daily?: boolean;
 }
 
 /** Triangle wave in [-1, 1] with no trig, so it's identical everywhere. */
@@ -195,14 +254,34 @@ export class Sim {
   rockfalls: Rockfall[] = [];
   events: SimEvent[] = [];
 
+  /** Daily Climb run (set from SimOptions.daily). */
+  readonly daily: boolean;
+  /** Daily Climb summit in meters, 0 in endless. Reaching it wins: dead, cause 'summit', `won`. */
+  readonly summit: number;
+  won = false;
+
+  /** Eruption surge phase and the lava's current distance below `maxY` (FALL_LIMIT when calm). */
+  surge: SurgePhase = 'none';
+  fallLimit = FALL_LIMIT;
+  /** Closest the lava comes in the current (or last) surge. */
+  surgeMin = SURGE_LIMIT;
+  /** Ticks since the current surge's rumble began. */
+  surgeTick = 0;
+  /** Height in meters (of `meters`) that sets off the next surge. */
+  nextSurge: number;
+  /** Surges set off so far. */
+  surges = 0;
+
   private readonly hazardsOn: boolean;
   private gen: Rng;
   private rockRng: Rng;
   private nextRock = 0;
   private topY = 0;
   private topX = WIDTH / 2;
-  private nextPickupY = FEATURE.pickups * UNITS_PER_METER;
+  private topped = false;
+  private nextPickupY: number;
   private recent: Platform[] = [];
+  private melted: Platform[] = [];
   private nextId = 1;
   private pBuckets = new Map<number, Platform[]>();
   private hBuckets = new Map<number, Hazard[]>();
@@ -211,6 +290,12 @@ export class Sim {
   constructor(seed: number, opts: SimOptions = {}) {
     this.seed = seed >>> 0;
     this.hazardsOn = opts.hazards !== false;
+    this.daily = opts.daily === true;
+    this.summit = this.daily ? summitMeters(this.seed) : 0;
+    this.nextPickupY = this.daily
+      ? Math.floor((FEATURE.pickups * this.summit) / DAILY_SPAN) * UNITS_PER_METER
+      : FEATURE.pickups * UNITS_PER_METER;
+    this.nextSurge = SURGE_FIRST + Math.floor(SURGE_FIRST_SPREAD * hashFrac(this.seed, 900));
     this.gen = new Rng(hash32(this.seed, 1));
     this.rockRng = new Rng(hash32(this.seed, 2));
     this.generateUntil(APEX * 12);
@@ -218,6 +303,77 @@ export class Sim {
 
   get meters(): number {
     return Math.floor(this.maxY / UNITS_PER_METER);
+  }
+
+  /**
+   * The height zones and features are read at. Endless: the meters themselves. Daily: squeezed so
+   * all six zones fit below the summit (`meters * 3400 / summit`). The difficulty ramp stays on real meters.
+   */
+  zoneMeters(meters: number): number {
+    if (!this.daily) return meters;
+    return Math.floor((Math.floor(meters) * DAILY_SPAN) / this.summit);
+  }
+
+  /** The zone index (into ZONES) at a height in real meters, squeezed in the Daily. */
+  zoneAt(meters: number): number {
+    return zoneIndexAt(this.zoneMeters(meters));
+  }
+
+  /** Fall limit `dt` ticks from now, if no new surge starts. */
+  fallLimitIn(dt: number): number {
+    if (this.surge === 'none') return FALL_LIMIT;
+    let e = this.surgeTick + dt;
+    const span = FALL_LIMIT - this.surgeMin;
+    if (e < SURGE_RUMBLE) return FALL_LIMIT;
+    e -= SURGE_RUMBLE;
+    if (e < SURGE_RISE) {
+      const u = e / SURGE_RISE;
+      return FALL_LIMIT - span * u * u * (3 - 2 * u);
+    }
+    e -= SURGE_RISE;
+    if (e < SURGE_HOLD) return this.surgeMin;
+    e -= SURGE_HOLD;
+    if (e < SURGE_EASE) return this.surgeMin + (span * e) / SURGE_EASE;
+    return FALL_LIMIT;
+  }
+
+  /** Where the lava will be `dt` ticks from now if you climb no higher (for the bot and the page). */
+  lavaAfter(dt: number): number {
+    return Math.max(this.lavaY, this.maxY - this.fallLimitIn(dt));
+  }
+
+  private surgeUpdate(): void {
+    if (this.surge === 'none') {
+      if (this.meters < this.nextSurge) return;
+      const at = this.nextSurge;
+      this.surge = 'rumble';
+      this.surgeTick = 0;
+      this.surgeMin = surgeLimit(at);
+      this.surges++;
+      // Everyone on the same seed gets the same surge heights.
+      this.nextSurge = at + Math.round(surgeGap(at) * (0.85 + 0.3 * hashFrac(this.seed, 901 + this.surges)));
+      this.events.push({ t: 'rumble', y: this.lavaY });
+    } else this.surgeTick++;
+    const e = this.surgeTick;
+    let ph: SurgePhase = 'rumble';
+    if (e >= SURGE_RUMBLE + SURGE_RISE + SURGE_HOLD + SURGE_EASE) ph = 'none';
+    else if (e >= SURGE_RUMBLE + SURGE_RISE + SURGE_HOLD) ph = 'ease';
+    else if (e >= SURGE_RUMBLE + SURGE_RISE) ph = 'hold';
+    else if (e >= SURGE_RUMBLE) ph = 'rise';
+    if (ph === 'rise' && this.surge === 'rumble') this.events.push({ t: 'surge', y: this.lavaY });
+    this.surge = ph;
+    this.fallLimit = this.fallLimitIn(0);
+  }
+
+  private reform(t: number): void {
+    if (this.melted.length === 0) return;
+    this.melted = this.melted.filter((p) => {
+      if (t - p.melt < CRUST_REFORM) return true;
+      p.melt = -1;
+      p.heat = 0;
+      this.events.push({ t: 'reform', x: platX(p, t), y: platY(p, t), w: p.w });
+      return false;
+    });
   }
 
   get heightNow(): number {
@@ -259,9 +415,20 @@ export class Sim {
     this.x = wrapX(this.x + this.vx + this.wind);
     this.y += this.vy;
 
+    this.reform(t);
     if (!riding && this.vy < 0) this.land(prevY, t);
     if (this.y > this.maxY) this.maxY = this.y;
-    if (this.maxY - FALL_LIMIT > this.lavaY) this.lavaY = this.maxY - FALL_LIMIT;
+    if (this.summit > 0 && this.maxY >= this.summit * UNITS_PER_METER) {
+      // Daily Climb won. The height counts as exactly the summit.
+      this.maxY = this.summit * UNITS_PER_METER;
+      this.won = true;
+      this.dead = true;
+      this.cause = 'summit';
+      this.events.push({ t: 'summit', x: this.x, y: this.maxY, ticks: t });
+      return;
+    }
+    this.surgeUpdate();
+    if (this.maxY - this.fallLimit > this.lavaY) this.lavaY = this.maxY - this.fallLimit;
     if (this.y < this.lavaY) {
       this.die('lava');
       return;
@@ -291,7 +458,7 @@ export class Sim {
     let best: Platform | null = null;
     let bestY = -Infinity;
     for (const p of this.near(this.pBuckets, this.y, 1)) {
-      if (p.broken >= 0) continue;
+      if (p.broken >= 0 || p.melt >= 0) continue;
       const py = platY(p, t);
       const pyPrev = platY(p, t - 1);
       if (prevY < pyPrev - 0.001 || this.y > py) continue;
@@ -324,6 +491,13 @@ export class Sim {
       this.iceTimer = ICE_TICKS;
       const cap = RUN_SPEED * 1.3;
       this.vx = Math.max(-cap, Math.min(cap, this.vx * 1.3));
+    } else if (best.kind === Kind.Crust) {
+      // Twice it holds; the third bounce still launches you, but the crust melts behind you.
+      if (++best.heat >= CRUST_BOUNCES) {
+        best.melt = t;
+        this.melted.push(best);
+        this.events.push({ t: 'melt', x: px, y: bestY, w: best.w });
+      }
     }
   }
 
@@ -390,7 +564,7 @@ export class Sim {
 
   private rockfall(t: number, meters: number): void {
     this.rockfalls = this.rockfalls.filter((b) => t - b.start <= ROCK_WARN + ROCK_LIVE);
-    if (rockfallOn(meters) && t >= this.nextRock && this.ride === -1) {
+    if (rockfallOn(this.zoneMeters(meters)) && t >= this.nextRock && this.ride === -1) {
       const d = difficulty(meters);
       const r = this.rockRng;
       const aimed = r.chance(0.55);
@@ -413,7 +587,7 @@ export class Sim {
 
   /** Gusts: calm, ramp up, hold, ramp down. The page shows the arrow during the calm. */
   windAt(t: number, meters: number): number {
-    const max = windStrength(meters);
+    const max = windStrength(this.zoneMeters(meters));
     if (max === 0) return 0;
     const k = Math.floor(t / GUST_CYCLE);
     const ph = t - k * GUST_CYCLE;
@@ -429,7 +603,7 @@ export class Sim {
 
   /** Direction of the gust that's coming or blowing, for the HUD. 0 when calm and nothing is coming. */
   gustDir(t: number, meters: number): number {
-    if (windStrength(meters) === 0) return 0;
+    if (windStrength(this.zoneMeters(meters)) === 0) return 0;
     const k = Math.floor(t / GUST_CYCLE);
     const ph = t - k * GUST_CYCLE;
     if (ph < 30) return 0;
@@ -463,8 +637,8 @@ export class Sim {
     list.push(item);
   }
 
-  private addPlatform(p: Omit<Platform, 'id' | 'broken'>): Platform {
-    const full: Platform = { ...p, id: this.nextId++, broken: -1 };
+  private addPlatform(p: Omit<Platform, 'id' | 'broken' | 'heat' | 'melt'>): Platform {
+    const full: Platform = { ...p, id: this.nextId++, broken: -1, heat: 0, melt: -1 };
     this.platforms.push(full);
     this.bucket(this.pBuckets, full);
     this.recent.push(full);
@@ -491,13 +665,17 @@ export class Sim {
       // The chamber floor: one ledge as wide as the shaft to start on.
       this.addPlatform({ x: WIDTH / 2, y: 0, w: WIDTH, kind: Kind.Normal, mx: 0, my: 0, per: 1, ph: 0, spring: null, path: true });
     }
-    while (this.topY < y) this.genStep();
+    while (!this.topped && this.topY < y) this.genStep();
   }
 
   private genStep(): void {
     const r = this.gen;
     const m = this.topY / UNITS_PER_METER;
     const d = difficulty(m);
+    // Features unlock on the zone height (squeezed in the Daily); difficulty stays on real meters.
+    const fm = this.zoneMeters(m);
+    // From the Crater Rim up, crust takes the place of ice.
+    const slick = zoneIndexAt(fm) >= CRUST_ZONE ? Kind.Crust : Kind.Ice;
 
     // The next ledge on the guaranteed route: about 7 m up at the bottom, stretching toward a full hop.
     let frac = 0.38 + 0.42 * d + r.range(-0.07, 0.07);
@@ -507,17 +685,26 @@ export class Sim {
     const x = wrapX(this.topX + r.range(-reach, reach));
     const w = Math.max(42, 84 - 44 * d) * r.range(0.85, 1.15);
 
+    // The Daily summit: one still ledge across the whole shaft, and nothing above it.
+    const summitY = this.summit * UNITS_PER_METER;
+    if (this.summit > 0 && y >= summitY) {
+      this.addPlatform({ x: WIDTH / 2, y: summitY, w: WIDTH, kind: Kind.Normal, mx: 0, my: 0, per: 1, ph: 0, spring: null, path: true, summit: true });
+      this.topY = summitY;
+      this.topped = true;
+      return;
+    }
+
     // Route ledges never crumble or fake: whatever breaks behind you, the way up is still there.
-    // (Crumbling ledges and fakes are only ever spares.)
+    // (Crumbling ledges and fakes are only ever spares. Crust melts only after two solid bounces and forms again.)
     let kind = Kind.Normal;
-    if (m >= FEATURE.ice && r.chance(0.3)) kind = Kind.Ice;
+    if (fm >= FEATURE.ice && r.chance(0.3)) kind = slick;
 
     let mx = 0;
     let my = 0;
     const per = r.int(130, 260);
     const ph = r.int(0, 600);
-    if (m >= FEATURE.moving && r.chance(0.12 + 0.45 * d)) mx = r.range(40, 60 + 110 * d);
-    if (m >= FEATURE.bobbing && r.chance(0.25)) {
+    if (fm >= FEATURE.moving && r.chance(0.12 + 0.45 * d)) mx = r.range(40, 60 + 110 * d);
+    if (fm >= FEATURE.bobbing && r.chance(0.25)) {
       my = r.range(25, 55);
       // Its highest point must still be in reach.
       const top = this.topY + MAX_GAP * APEX;
@@ -535,8 +722,8 @@ export class Sim {
     if (y >= this.nextPickupY && mx === 0 && my === 0 && kind === Kind.Normal && spring === null) {
       const roll = r.next();
       let pk = roll < 0.4 ? PickupKind.Shield : roll < 0.8 ? PickupKind.Geyser : PickupKind.Bubble;
-      if (pk === PickupKind.Bubble && m < FEATURE.bubble) pk = PickupKind.Geyser;
-      if (pk === PickupKind.Shield && m < FEATURE.bats) pk = PickupKind.Geyser;
+      if (pk === PickupKind.Bubble && fm < FEATURE.bubble) pk = PickupKind.Geyser;
+      if (pk === PickupKind.Shield && fm < FEATURE.bats) pk = PickupKind.Geyser;
       const u: Pickup = { id: this.nextId++, kind: pk, x, y: y + PICKUP_R + 2, taken: false };
       this.pickups.push(u);
       this.bucket(this.uBuckets, u);
@@ -550,9 +737,9 @@ export class Sim {
     const extras = Math.floor(want) + (r.chance(want - Math.floor(want)) ? 1 : 0);
     for (let i = 0; i < extras; i++) {
       // Spares carry all the crumbling, a bit more of it now the route has none.
-      const ek = m >= FEATURE.crumble && r.chance(0.2 + 0.3 * d) ? Kind.Crumble : m >= FEATURE.ice && r.chance(0.3) ? Kind.Ice : Kind.Normal;
+      const ek = fm >= FEATURE.crumble && r.chance(0.2 + 0.3 * d) ? Kind.Crumble : fm >= FEATURE.ice && r.chance(0.3) ? slick : Kind.Normal;
       const ew = Math.max(40, 80 - 44 * d) * r.range(0.8, 1.1);
-      const emx = m >= FEATURE.moving && r.chance(0.1 + 0.25 * d) ? r.range(30, 90) : 0;
+      const emx = fm >= FEATURE.moving && r.chance(0.1 + 0.25 * d) ? r.range(30, 90) : 0;
       const eper = r.int(140, 280);
       const eph = r.int(0, 600);
       for (let tries = 0; tries < 4; tries++) {
@@ -565,7 +752,7 @@ export class Sim {
     }
 
     // Fakes that look almost real.
-    if (m >= FEATURE.fakes && r.chance(0.1 + 0.4 * d)) {
+    if (fm >= FEATURE.fakes && r.chance(0.1 + 0.4 * d)) {
       const fx = wrapX(x + r.range(80, WIDTH - 80));
       const fy = lowY + band * r.range(0.3, 1);
       const fw = w * r.range(0.9, 1.1);
@@ -575,7 +762,7 @@ export class Sim {
     }
 
     // Bats patrol between ledges, kept clear of the route ledge itself.
-    if (m >= FEATURE.bats && band > 60 && r.chance(0.04 + 0.22 * d)) {
+    if (fm >= FEATURE.bats && band > 60 && r.chance(0.04 + 0.22 * d)) {
       this.addHazard({
         kind: HazardKind.Bat,
         x: r.range(0, WIDTH),
@@ -585,7 +772,7 @@ export class Sim {
         ph: r.int(0, 600),
       });
     }
-    if (m >= FEATURE.wisps && band > 60 && r.chance(0.04 + 0.2 * d)) {
+    if (fm >= FEATURE.wisps && band > 60 && r.chance(0.04 + 0.2 * d)) {
       this.addHazard({
         kind: HazardKind.Wisp,
         x: r.range(0, WIDTH),
@@ -621,9 +808,9 @@ export interface ReplayResult {
   ticks: number;
 }
 
-/** Re-run a recorded game. `ticks` is how many steps the player took. */
-export function replay(seed: number, log: InputLog, ticks: number): ReplayResult {
-  const sim = new Sim(seed);
+/** Re-run a recorded game. `ticks` is how many steps the player took. Daily runs need `{ daily: true }`. */
+export function replay(seed: number, log: InputLog, ticks: number, opts: SimOptions = {}): ReplayResult {
+  const sim = new Sim(seed, { daily: opts.daily === true });
   let k = 0;
   let input = 0;
   while (sim.tick < ticks && !sim.dead) {

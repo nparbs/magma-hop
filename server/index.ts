@@ -210,7 +210,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
     const minMs = (ticks / TICK_RATE) * 1000 * 0.9 - 3000;
     if (Date.now() - run.issued < minMs) return send(res, 400, { error: 'too fast' });
 
-    const r = replay(run.seed, body.log, ticks);
+    const r = replay(run.seed, body.log, ticks, { daily: run.day !== null });
     if (r.ticks !== ticks) return send(res, 400, { error: 'replay mismatch' });
     if (Number(body.meters) !== r.meters) console.warn(`replay height differs: claimed ${body.meters}, replayed ${r.meters}`);
 
@@ -224,7 +224,16 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
         : null;
     if (run.day) {
       const scope = { day: run.day };
-      return send(res, 200, { id, meters: r.meters, day: run.day, best: store.best(player, scope)?.meters ?? r.meters, rank: store.rank(player, r.meters, scope) });
+      const cause = r.cause || 'quit';
+      return send(res, 200, {
+        id,
+        meters: r.meters,
+        day: run.day,
+        summit: cause === 'summit',
+        ticks,
+        best: store.best(player, scope)?.meters ?? r.meters,
+        rank: store.rank(player, { meters: r.meters, ticks, cause }, scope),
+      });
     }
     const all = { since: 0 };
     const week = { since: weekStart() };
@@ -272,13 +281,15 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
     if (!allow('board:' + ip, 60)) return send(res, 429, { error: 'slow down' });
     const scope = scopeOf(url.searchParams.get('range'));
     // Only runs under today's rules can be watched, so older ones go out without an id.
-    const top = store.top(scope, 50).map((r) => ({ id: r.sim === SIM_VERSION ? r.id : null, name: r.name, meters: r.meters, when: r.when }));
+    const top = store
+      .top(scope, 50)
+      .map((r) => ({ id: r.sim === SIM_VERSION ? r.id : null, name: r.name, meters: r.meters, when: r.when, ticks: r.ticks, cause: r.cause }));
     const me = url.searchParams.get('player');
     let mine = null;
     if (token(me)) {
       const key = playerKey(me!);
       const best = store.best(key, scope);
-      if (best !== null) mine = { id: best.id, meters: best.meters, rank: store.rank(key, best.meters, scope) };
+      if (best !== null) mine = { id: best.id, meters: best.meters, ticks: best.ticks, cause: best.cause, rank: store.rank(key, best, scope) };
     }
     return send(res, 200, { top, me: mine, weekStart: weekStart(), day: utcDay() });
   }

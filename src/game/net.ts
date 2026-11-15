@@ -8,6 +8,9 @@ export interface BoardEntry {
   name: string;
   meters: number;
   when: number;
+  /** How the run ended ('summit' for a Daily win) and how long it took. Older servers may leave them out. */
+  ticks?: number;
+  cause?: string;
 }
 
 export interface Board {

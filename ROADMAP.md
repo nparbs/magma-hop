@@ -141,6 +141,18 @@ Laury, the tutorial guide (asked for by the owner on 2026-11-14):
 - [x] Never blocks steering during play (the bubble ignores touches). **Laury on/off** on the title screen and in the pause menu; How to play has a button to see her tutorial again.
 - [x] Her lines are data in `src/game/laury-lines.ts`. `scripts/laurycheck.mjs` checks the whole flow headless.
 
+## v0.6 — eruption (built 2026-11-14 on branch `v0.6-eruption`, not shipped)
+
+Asked for by the owner on 2026-11-14, to lean into the volcano theme.
+
+- [x] **Eruption surges.** The volcano rumbles for 2 s, then the lava rises from 28 m below your best height to about 12 m below (wider high up, so a route gap always fits), holds, and lets go. The lava never moves down: the gap reopens as you climb. Surges come at heights set by the seed, the first around 260 to 310 m, then closer together with height down to 120 m apart.
+- [x] **Crust ledges** replace ice ledges from the Crater Rim up (ice stays below). Two solid bounces, the third still launches you but melts the ledge, and it re-forms 3 s later. Allowed on route ledges; the owner left that choice to Claude.
+- [x] **Daily summit.** The Daily Climb has a top, set by the day's seed between 1,200 and 2,000 m, with all six zones squeezed below it. Reaching it erupts you out and wins the run. The Daily board lists summit finishers first, fastest first, then everyone else by height. The HUD shows `1,240 / 1,650 m`.
+- [x] **Heat feel.** Shimmer above the lava (off with calm effects), the ember glows brighter as the lava gets close, shake during a rumble, a music pulse layer during a surge, and rumble, surge, sizzle and fanfare sounds.
+- [x] **Laury and naming.** Laury has lines for a rumble, a surge survived, a near miss and the summit. The game-over screen names the cause: "Scorched at 840 m" (`src/game/cause-text.ts`).
+- [x] `SIM_VERSION` is 4. Runs stored under 3 keep their heights on the board but can no longer be watched (the board hides their watch button).
+- [ ] Owner playtest. Surges are the big difficulty change: the no-hazards bot still passes 1 km every run, but most of its runs now end in the Ice Cap (1.4 to 1.9 km), and the careful bot reached the Daily summit on 3 of 12 seeds. If it plays too hard, soften surges in the Ice Cap first.
+
 ## Later ideas (not agreed)
 
 - More hazards per zone.
@@ -151,7 +163,6 @@ Laury, the tutorial guide (asked for by the owner on 2026-11-14):
 
 ## Open questions for the owner
 
-- Ice ledges keep appearing above the Ice Cap (in the Crater Rim and Ash Clouds). Keep them there, or swap them for something that fits those zones?
 - Should ending a run from the pause menu count on the board? It does now.
 - Weekly board resets Monday 00:00 UTC. Is that the right week?
 - The Daily Climb changes at 00:00 UTC and keeps daily runs off the endless boards. Both are Claude's picks; change either if you like.

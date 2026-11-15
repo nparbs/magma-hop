@@ -1,7 +1,7 @@
 {
   "name": "magma-hop",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "An endless bouncing climb out of a volcano, with a global height board.",
   "type": "module",
   "scripts": {

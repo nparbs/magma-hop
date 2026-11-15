@@ -3,14 +3,17 @@
 // It knows which ledges are fake. With `careful` set it also keeps away from hazards.
 
 import {
-  GRAVITY, INPUT_MAX, Kind, PLAYER_H, PickupKind, RUN_SPEED, Sim, WIDTH, hazardPos, platX, platY, wrapDx, type Platform,
+  GRAVITY, ICE_STEER, INPUT_MAX, Kind, STEER, PLAYER_H, PickupKind, RUN_SPEED, Sim, WIDTH, hazardPos, platX, platY, wrapDx, type Platform,
 } from './sim';
+
+/** How long it leaves a missed ledge alone before trying it again. */
+const AVOID_TICKS = 180;
 
 export class Bot {
   private targetId = -1;
   private targetY = 0;
-  /** Ledges it kept missing (something was in the way). */
-  private avoid = new Set<number>();
+  /** Ledges it kept missing (something was in the way), and the tick it tries them again. */
+  private avoid = new Map<number, number>();
   private bestSeen = 0;
   private stuck = 0;
 
@@ -20,16 +23,17 @@ export class Bot {
     if (sim.ride !== -1) return 0;
     // Bounced somewhere other than where it was heading: stop trying for that ledge.
     for (const e of sim.events) {
-      if ((e.t === 'bounce' || e.t === 'spring') && this.targetId >= 0 && Math.abs(e.y - this.targetY) > 3) this.avoid.add(this.targetId);
+      if ((e.t === 'bounce' || e.t === 'spring') && this.targetId >= 0 && Math.abs(e.y - this.targetY) > 3) this.avoid.set(this.targetId, sim.tick + AVOID_TICKS);
     }
     // Going nowhere for five seconds: give up on the current ledge too.
     if (sim.maxY > this.bestSeen + 1) {
       this.bestSeen = sim.maxY;
       this.stuck = 0;
     } else if (++this.stuck > 300) {
-      this.avoid.add(this.targetId);
+      this.avoid.set(this.targetId, sim.tick + AVOID_TICKS);
       this.stuck = 0;
     }
+    if (this.avoid.size > 64) for (const [id, until] of this.avoid) if (until <= sim.tick) this.avoid.delete(id);
     const t = sim.tick + 1;
     const g = GRAVITY;
     const apexY = sim.vy > 0 ? sim.y + (sim.vy * sim.vy) / (2 * g) : sim.y;
@@ -41,7 +45,7 @@ export class Bot {
     let held: { dx: number; T: number; score: number; p: Platform } | null = null;
 
     for (const p of sim.platforms) {
-      if (p.kind === Kind.Fake || p.broken >= 0 || this.avoid.has(p.id)) continue;
+      if (p.kind === Kind.Fake || p.broken >= 0 || p.melt >= 0 || (this.avoid.get(p.id) ?? -1) > sim.tick) continue;
       if (p.y > apexY + 80 || p.y < sim.lavaY - 60) continue;
       // Ticks until we fall to this ledge's height.
       let T = this.fallTime(sim, p.y);
@@ -51,7 +55,8 @@ export class Bot {
         T = this.fallTime(sim, py);
         if (T < 0) continue;
       }
-      if (py <= sim.lavaY + 8 || py > apexY - 4) continue;
+      // A surge can bring the lava up while we're in the air: judge by where it will be when we land.
+      if (py <= sim.lavaAfter(T + 4) + 8 || py > apexY - 4) continue;
 
       let aim = platX(p, t + T);
       let half = p.w / 2 - 6;
@@ -71,12 +76,16 @@ export class Bot {
       }
       const dx = wrapDx(sim.x, aim) - sim.wind * T * 0.8;
       const need = Math.max(0, Math.abs(dx) - half);
-      const can = RUN_SPEED * Math.max(0, T - 8) * 0.85;
+      const can = this.reach(sim, dx < 0 ? -1 : 1, T - 4);
       if (need > can) continue;
 
       let score = py - (need / (can + 1)) * 60;
       score += bonus;
+      // In a surge, a ledge the lava will reach by the bounce after next is a trap.
+      if (sim.surge !== 'none' && py < sim.lavaAfter(T + 70) + 20) score -= 150;
       if (p.kind === Kind.Ice) score -= 25;
+      // A crust about to melt still bounces you, but the next ledge had better be up.
+      if (p.kind === Kind.Crust) score -= 8 * p.heat;
       if (p.mx !== 0) score -= 15;
       if (this.careful) {
         for (const b of sim.rockfalls) if (Math.abs(wrapDx(aim, b.x)) < 50) score -= 120;
@@ -119,6 +128,18 @@ export class Bot {
     // Get over the ledge in about half the time left, then hold there.
     const want = dx / Math.max(1, bestT * 0.5);
     return Math.max(-INPUT_MAX, Math.min(INPUT_MAX, Math.round((want / RUN_SPEED) * INPUT_MAX)));
+  }
+
+  /** How far sideways (toward `dir`) it can get in `T` ticks, counting how slippery steering is after ice. */
+  private reach(sim: Sim, dir: number, T: number): number {
+    let v = sim.vx * dir;
+    let ice = sim.iceTimer;
+    let d = 0;
+    for (let k = 0; k < T; k++) {
+      v = Math.min(RUN_SPEED, v + (ice-- > 0 ? ICE_STEER : STEER));
+      d += v;
+    }
+    return Math.max(0, d * 0.88);
   }
 
   /** Ticks until the climber, on its current arc, comes down to height `py`. -1 if it never gets that high. */

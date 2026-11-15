@@ -68,11 +68,13 @@ async function endRun(page) {
   check(s.mode === 'play' && s.show && !s.tour, `next run: a quip, no tutorial: "${s.text}"`);
   await page.screenshot({ path: 'shots/laury-quip-desktop.png' });
   await page.waitForTimeout(5000);
-  check(!(await state(page)).show, 'the quip goes away by itself');
+  s = await state(page);
+  check(!s.show, `the quip goes away by itself${s.show ? `: "${s.text}"` : ''}`);
 
   // 500 m check-in (teleport, like the zones screenshots).
   await page.evaluate(() => {
     const s = window.magmahop.sim;
+    s.nextSurge = 1e9; // no rumble on the way: her rumble line would replace the check-in
     s.generateUntil(5200 + 3000);
     const p = s.platforms.filter((p) => p.path && p.y >= 5100).sort((a, b) => a.y - b.y)[0];
     s.y = p.y + 5; s.x = p.x; s.vy = 0; s.maxY = s.y; s.lavaY = s.y - 200;
@@ -91,7 +93,7 @@ async function endRun(page) {
   s = await state(page);
   check(s.mode === 'intro' && /Daily/.test(s.text), `first Daily Climb: her Daily tutorial: "${s.text}"`);
   const nd = await clickThrough(page);
-  check(nd >= 4 && nd <= 5, `Daily tutorial is short (${nd} lines), no basics again`);
+  check(nd >= 4 && nd <= 6, `Daily tutorial is short (${nd} lines), no basics again`);
   await endRun(page);
   await page.click('#againBtn');
   await page.waitForTimeout(1600);

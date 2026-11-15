@@ -13,6 +13,9 @@ export interface BoardRow {
   when: number;
   /** Rules version the run was played under. Only the current version can be watched. */
   sim: number;
+  /** How long the run lasted and how it ended ('summit' for a Daily Climb win). */
+  ticks: number;
+  cause: string;
 }
 
 export interface StoredRun {
@@ -49,6 +52,21 @@ export const utcDay = (now = Date.now()) => new Date(now).toISOString().slice(0,
 
 function where(s: Scope): [string, (string | number)[]] {
   return 'day' in s ? ['day = ?', [s.day]] : ['day IS NULL AND created >= ?', [s.since]];
+}
+
+/**
+ * Board order. Endless: highest first. Daily: everyone who reached the summit first, fastest first,
+ * then the rest highest first. Ties go to whoever got there first.
+ */
+function order(s: Scope): string {
+  return 'day' in s ? "(cause = 'summit') DESC, CASE WHEN cause = 'summit' THEN ticks END, meters DESC, created" : 'meters DESC, created';
+}
+
+/** The run that a board compares: its height, and for the Daily whether (and how fast) it reached the summit. */
+export interface RankedRun {
+  meters: number;
+  ticks?: number;
+  cause?: string;
 }
 
 export class Store {
@@ -103,35 +121,53 @@ export class Store {
     return Number(res.lastInsertRowid);
   }
 
-  /** Each climber's best run on this board, highest first; ties go to whoever got there first. */
+  /** Each climber's best run on this board, in board order (see `order`). */
   top(scope: Scope, limit: number): BoardRow[] {
     const [w, args] = where(scope);
+    const ord = order(scope);
     return this.db
       .prepare(
-        `SELECT id, name, meters, created AS "when", sim FROM (
-           SELECT id, name, meters, created, sim,
-                  ROW_NUMBER() OVER (PARTITION BY player ORDER BY meters DESC, created) AS k
+        `SELECT id, name, meters, created AS "when", sim, ticks, cause FROM (
+           SELECT id, name, meters, created, sim, ticks, cause,
+                  ROW_NUMBER() OVER (PARTITION BY player ORDER BY ${ord}) AS k
            FROM runs WHERE ${w})
-         WHERE k = 1 ORDER BY meters DESC, created LIMIT ?`,
+         WHERE k = 1 ORDER BY ${ord} LIMIT ?`,
       )
       .all(...args, limit) as unknown as BoardRow[];
   }
 
   /** A climber's best run on this board. */
-  best(player: string, scope: Scope): { id: number; meters: number } | null {
+  best(player: string, scope: Scope): { id: number; meters: number; ticks: number; cause: string } | null {
     const [w, args] = where(scope);
     const row = this.db
-      .prepare(`SELECT id, meters FROM runs WHERE player = ? AND ${w} ORDER BY meters DESC, created LIMIT 1`)
-      .get(player, ...args) as { id: number; meters: number } | undefined;
+      .prepare(`SELECT id, meters, ticks, cause FROM runs WHERE player = ? AND ${w} ORDER BY ${order(scope)} LIMIT 1`)
+      .get(player, ...args) as { id: number; meters: number; ticks: number; cause: string } | undefined;
     return row ?? null;
   }
 
-  /** 1-based place of a height among climbers' bests (other climbers who beat it, plus one). */
-  rank(player: string, meters: number, scope: Scope): number {
+  /**
+   * 1-based place of a run among climbers' bests (other climbers who beat it, plus one).
+   * Pass a number for the endless boards; on the Daily, pass the run so a summit counts.
+   */
+  rank(player: string, run: number | RankedRun, scope: Scope): number {
+    const r = typeof run === 'number' ? { meters: run } : run;
     const [w, args] = where(scope);
+    if (!('day' in scope)) {
+      const row = this.db
+        .prepare(`SELECT COUNT(*) AS n FROM (SELECT player, MAX(meters) AS m FROM runs WHERE ${w} AND player != ? GROUP BY player) WHERE m > ?`)
+        .get(...args, player, r.meters) as { n: number };
+      return row.n + 1;
+    }
+    const won = r.cause === 'summit' ? 1 : 0;
     const row = this.db
-      .prepare(`SELECT COUNT(*) AS n FROM (SELECT player, MAX(meters) AS m FROM runs WHERE ${w} AND player != ? GROUP BY player) WHERE m > ?`)
-      .get(...args, player, meters) as { n: number };
+      .prepare(
+        `SELECT COUNT(*) AS n FROM (
+           SELECT (cause = 'summit') AS s, ticks, meters,
+                  ROW_NUMBER() OVER (PARTITION BY player ORDER BY ${order(scope)}) AS k
+           FROM runs WHERE ${w} AND player != ?)
+         WHERE k = 1 AND (s > ? OR (s = ? AND (CASE WHEN s = 1 THEN ticks < ? ELSE meters > ? END)))`,
+      )
+      .get(...args, player, won, won, r.ticks ?? 0, r.meters) as { n: number };
     return row.n + 1;
   }
 

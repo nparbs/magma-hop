@@ -9,6 +9,11 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 await page.goto(URL);
+// Laury's first-time tutorial holds the run, so mark it seen.
+await page.evaluate(() => {
+  localStorage.setItem('magmahop.seen.basics', '1');
+  localStorage.setItem('magmahop.seen.daily', '1');
+});
 await page.waitForTimeout(800);
 
 const music = () => page.evaluate(() => window.magmahop.music);

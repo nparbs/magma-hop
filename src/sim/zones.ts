@@ -54,6 +54,15 @@ export const ZONES: Zone[] = [
   },
 ];
 
+/**
+ * The Daily Climb ends at a summit (1,200-2,000 m) and squeezes the whole volcano below it: zone
+ * and feature heights are read on meters scaled by this much over the summit.
+ */
+export const DAILY_SPAN = 3400;
+
+/** From this zone (Crater Rim) up, the generator makes crust ledges where it used to make ice. */
+export const CRUST_ZONE = 4;
+
 export function zoneIndexAt(meters: number): number {
   let i = 0;
   while (i + 1 < ZONES.length && meters >= ZONES[i + 1].from) i++;

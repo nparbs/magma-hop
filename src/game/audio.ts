@@ -138,6 +138,28 @@ export class Sfx {
     this.tone(600, 80, 0.7, 'sawtooth', 0.18);
     this.noise(0.5, 0.35, 700, 0.6);
   }
+  /** A low growl under the floor: the warning before a surge. */
+  rumble(): void {
+    this.tone(70, 38, 1.6, 'sawtooth', 0.2);
+    this.tone(55, 30, 1.8, 'square', 0.1, 0.15);
+    this.noise(1.7, 0.25, 160, 0.6);
+  }
+  /** The lava lunges up. */
+  surge(): void {
+    this.noise(1.0, 0.35, 700, 0.4);
+    this.tone(120, 520, 0.9, 'sine', 0.14);
+  }
+  /** A crust ledge giving way. */
+  melt(): void {
+    this.noise(0.5, 0.22, 4200, 0.5);
+    this.tone(300, 90, 0.3, 'sine', 0.1);
+  }
+  /** The summit eruption: a boom and a rising fanfare. */
+  fanfare(): void {
+    this.tone(110, 40, 0.8, 'square', 0.25);
+    this.noise(1.2, 0.4, 500, 0.4);
+    [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => this.tone(f, f, 0.5, 'triangle', 0.14, 0.4 + i * 0.12));
+  }
   zone(): void {
     [523, 659, 784, 1047].forEach((f, i) => this.tone(f, f, 0.35, 'triangle', 0.12, i * 0.09));
   }
@@ -182,6 +204,8 @@ export class Music {
   private timer = 0;
   private on = true;
   private ducked = false;
+  /** A throbbing layer on top of the song while the lava surges. */
+  pulse = false;
   /** The last song played for each cue, so a zone doesn't repeat the same one twice running. */
   private lastPick = new Map<string, Song>();
 
@@ -317,6 +341,10 @@ export class Music {
     }
     if (s.pad && i === 0) {
       for (const d of [0, 2, 4]) this.voice(midiHz(note(chord + d, 1)), t, stepS * 16, 'triangle', 0.045, 1400, out, 0.5);
+    }
+    if (this.pulse && out === this.current?.bus) {
+      if (i % 4 === 0) this.voice(midiHz(s.root + s.scale[((chord % 7) + 7) % 7] - 24), t, stepS * 3, 'sawtooth', 0.14, 380, out);
+      if (i % 4 === 2) this.hiss(t, 0.08, 0.1, 5200, 1.2, out);
     }
     if (s.kick[i] === 'x') this.kick(t, out);
     if (s.snare[i] === 'x') this.hiss(t, 0.14, 0.22, 1800, 0.8, out);

@@ -48,6 +48,34 @@ describe('board', () => {
     expect(s.best('a', { day: '2026-11-13' })).toBeNull();
   });
 
+  it('puts Daily summit finishers first, fastest first, then everyone else by height', () => {
+    const s = new Store(':memory:');
+    const day = '2026-11-14';
+    const d = (player: string, name: string, meters: number, ticks: number, cause: string) => ({ ...run(player, name, meters, day), ticks, cause });
+    s.add(d('a', 'Ann', 1500, 5000, 'summit'));
+    s.add(d('a', 'Ann', 1500, 4000, 'summit'));
+    s.add(d('b', 'Bo', 1500, 4500, 'summit'));
+    s.add(d('c', 'Cy', 1490, 3000, 'lava'));
+    s.add(d('e', 'Ed', 700, 900, 'bat'));
+    const top = s.top({ day }, 10);
+    expect(top.map((r) => [r.name, r.ticks, r.cause])).toEqual([
+      ['Ann', 4000, 'summit'],
+      ['Bo', 4500, 'summit'],
+      ['Cy', 3000, 'lava'],
+      ['Ed', 900, 'bat'],
+    ]);
+    expect(s.best('a', { day })).toMatchObject({ ticks: 4000, cause: 'summit' });
+    expect(s.rank('b', { meters: 1500, ticks: 4500, cause: 'summit' }, { day })).toBe(2);
+    expect(s.rank('z', { meters: 1500, ticks: 100, cause: 'summit' }, { day })).toBe(1);
+    expect(s.rank('c', { meters: 1490, ticks: 3000, cause: 'lava' }, { day })).toBe(3);
+    expect(s.rank('z', { meters: 800, ticks: 1, cause: 'lava' }, { day })).toBe(4);
+    // Endless boards still go by height alone.
+    s.add({ ...run('a', 'Ann', 300), ticks: 50, cause: 'lava' });
+    s.add({ ...run('b', 'Bo', 400), ticks: 9000, cause: 'bat' });
+    expect(s.top(ALL, 10).map((r) => [r.name, r.meters])).toEqual([['Bo', 400], ['Ann', 300]]);
+    expect(s.rank('a', 300, ALL)).toBe(2);
+  });
+
   it('hands back a stored run with its inputs', () => {
     const s = new Store(':memory:');
     const id = s.add({ ...run('a', 'Ann', 120, '2026-11-14'), skin: 3 });

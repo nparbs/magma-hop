@@ -10,7 +10,7 @@ export class Playback {
   private input = 0;
 
   constructor(readonly run: StoredRun) {
-    this.sim = new Sim(run.seed);
+    this.sim = new Sim(run.seed, { daily: run.day != null });
     this.prev = { x: this.sim.x, y: this.sim.y };
   }
 

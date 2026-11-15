@@ -23,6 +23,7 @@ export function dailyTour(liveOn: boolean): string[] {
     "Learn it, try again, beat your best. It has its own board, so it's a fair fight.",
     'Your best try today races you as a blue ghost. Beat your ghost, basically.',
     ...(liveOn ? ["Anyone climbing it right now hops along beside you too. Wave! They can't see it, but it's polite."] : []),
+    'The Daily Climb has a summit. Reach it fastest and you top the board.',
     'Good luck. Same volcano, so no excuses!',
   ];
 }
@@ -83,6 +84,12 @@ export const AFTER: Record<string, string[]> = {
     "That rock had your name on it. Literally, I'm checking. Nope, just rock.",
   ],
   quit: ['You called it early last time. Snack break? Respect.'],
+  summit: [
+    'You reached the top last time! Want to see if you can do it faster?',
+    'The eruption launched you out. Hard to beat, but try.',
+    'Last run, you beat the mountain. This run, beat yourself.',
+    'Top of the volcano, last time. Let\'s see if it happens again.',
+  ],
 };
 
 /** Check-ins at the 500 m marks. The first few are fixed, then random ones. */
@@ -102,6 +109,46 @@ export const CHECK_IN: string[] = [
   "{h}! Okay, show-off.",
   "{h}! I'm telling everyone I trained you.",
   "{h}! How's the view? Mine's mostly smoke.",
+];
+
+/** When the volcano starts rumbling and the lava is about to surge. */
+export const RUMBLE: string[] = [
+  'Ooh, feel that? The volcano is clearing its throat.',
+  'Rumble alert! Something hot is coming up. Hop!',
+  "The ground's buzzing. That's never good. Climb!",
+  "Lava's about to surge. Move your feet, friend.",
+  "Here it comes! Well, it's coming. Get higher!",
+  'Deep breath. The volcano is about to sneeze.',
+];
+
+/** After the player gets through a surge. */
+export const SURGE_SURVIVED: string[] = [
+  'Whew! You outran a whole wall of lava. Nice.',
+  'Still here? Good. That surge was rude.',
+  'The lava came up, but you went up faster. Winning.',
+  'That was close, and you stayed ahead of it. Good work.',
+  "Surge dodged! I didn't even blink. I did blink.",
+  'Look at you, riding the lava wave like a pro.',
+];
+
+/** The lava got very close, but the player escaped. */
+export const NEAR_MISS: string[] = [
+  'Ooh, that was close! I could feel the heat from here.',
+  'Your tail was basically glowing. Lucky!',
+  'The lava licked your heels. You got away.',
+  'Too close! My eyebrows are singed. Keep going.',
+  'Nice escape. That gap was tiny and you took it.',
+  "Whoa! I think I just screamed. Don't tell anyone.",
+];
+
+/** Reaching the summit in the Daily Climb; the eruption launches the player out. */
+export const SUMMIT: string[] = [
+  'The summit! The eruption launched you right out. Wow.',
+  'You made it to the top. The volcano is impressed. Grudgingly.',
+  'Summit reached! The mountain is rumbling in applause.',
+  'You beat the mountain. Fastest one wins the board.',
+  'Top of the volcano! It blew its top, and so did I.',
+  'Erupted out the top, and you did it. Nice one!',
 ];
 
 /** Pick from a list, avoiding the lines in `recent` when it can. */

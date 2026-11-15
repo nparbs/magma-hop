@@ -499,6 +499,9 @@ export class Renderer {
   private springAnim = new Map<number, number>();
   private wind: { x: number; y: number; len: number; sp: number }[] = [];
   private time = 0;
+  private sim: Sim | null = null;
+  /** Seconds since the summit eruption began, or -1. */
+  private erupt = -1;
   private face = 1;
   /** Calm effects: no screen flashes, no shake, no blinking warnings. */
   calm = false;
@@ -585,6 +588,16 @@ export class Renderer {
     }
   }
 
+  /** A small puff of smoke and sparks along a ledge. */
+  private puff(x: number, y: number, w: number, colors: string[]): void {
+    for (let i = 0; i < Math.max(5, w / 10); i++) {
+      this.particles.push({
+        x: x + (Math.random() - 0.5) * w, y, vx: (Math.random() - 0.5) * 0.8, vy: 0.6 + Math.random() * 1.2,
+        life: 0, max: 24 + Math.random() * 16, color: colors[i % colors.length], size: 1 + (i % 2), grav: -0.01,
+      });
+    }
+  }
+
   private chunks(x: number, y: number, w: number, colors: string[]): void {
     for (let i = 0; i < Math.max(6, w / 8); i++) {
       this.particles.push({
@@ -595,7 +608,7 @@ export class Renderer {
   }
 
   onEvent(e: Sim['events'][number], sim: Sim): void {
-    const zone = ZONES[zoneIndexAt(e.y / UNITS_PER_METER)];
+    const zone = ZONES[sim.zoneAt(e.y / UNITS_PER_METER)];
     switch (e.t) {
       case 'bounce':
         this.squash = 1;
@@ -635,6 +648,26 @@ export class Renderer {
         this.flash = 0.5;
         this.flashColor = '#9fe8ff';
         break;
+      case 'rumble':
+        this.shake = Math.max(this.shake, 3);
+        break;
+      case 'surge':
+        this.flash = Math.max(this.flash, 0.3);
+        this.flashColor = '#ff7a1e';
+        this.shake = Math.max(this.shake, 4);
+        break;
+      case 'melt':
+        this.puff(e.x, e.y, e.w, ['#ffb02e', '#ff5a1e', '#5a4a4a']);
+        break;
+      case 'reform':
+        this.puff(e.x, e.y, e.w, ['#8a7a7a', '#3a2a2a']);
+        break;
+      case 'summit':
+        this.erupt = 0;
+        this.flash = 1;
+        this.flashColor = '#fff0a0';
+        this.shake = 10;
+        break;
       case 'strike':
         this.shake = Math.max(this.shake, 5);
         break;
@@ -663,6 +696,11 @@ export class Renderer {
     const { ctx, b } = this;
     this.time += dt;
     const k = dt * 60;
+    if (sim !== this.sim) this.erupt = -1;
+    this.sim = sim;
+    if (this.erupt >= 0) this.erupt += dt;
+    // The ground trembles through the warning rumble.
+    if (sim.surge === 'rumble' && !sim.dead) this.shake = Math.max(this.shake, 2.5);
 
     // Smoothed player position between ticks.
     let px = sim.x;
@@ -677,8 +715,10 @@ export class Renderer {
     this.camBottom = this.lava - LAVA_SHOW;
     const camM = (this.camBottom + (this.bh * A) / 2) / UNITS_PER_METER;
 
-    this.drawBackdrop(camM);
+    const zM = sim.zoneMeters(camM);
+    this.drawBackdrop(zM);
     this.drawFloor(sim);
+    this.drawSummit(sim);
 
     // Clip to the shaft so wrapped copies don't spill into the sides.
     b.save();
@@ -694,11 +734,12 @@ export class Renderer {
     if (this.ghost) this.drawGhost(this.ghost);
     this.drawRivals();
     if (!sim.dead) this.drawPlayer(px, py, sim, k);
+    else if (sim.won && this.erupt >= 0) this.drawEruption(px, py, sim, k);
     this.drawParticles(k);
     b.restore();
 
-    this.drawLava();
-    this.drawSides(camM);
+    this.drawLava(sim);
+    this.drawSides(zM);
 
     // Blow the buffer up onto the screen.
     if (this.calm) {
@@ -878,10 +919,13 @@ export class Renderer {
     }
   }
 
-  private drawLava(): void {
+  private drawLava(sim: Sim): void {
     const { b } = this;
     const top = this.ay(this.lava);
-    const t = this.time;
+    const t = this.time * (sim.surge === 'rise' || sim.surge === 'hold' ? 1.8 : 1);
+    // 0..1: how worked up the lava is.
+    const hot = sim.surge === 'rise' || sim.surge === 'hold' ? 1 : sim.surge === 'none' ? 0 : 0.4;
+    const LV = hot ? LAVA.map((c, i) => mix(c, i < 2 ? '#fff6b0' : '#ff7a1e', 0.35 * hot)) : LAVA;
     // Heat haze above the surface.
     for (let i = 0; i < 4; i++) {
       b.globalAlpha = 0.07 * (4 - i);
@@ -889,21 +933,31 @@ export class Renderer {
     }
     b.globalAlpha = 1;
     for (let x = 0; x < this.bw; x += 2) {
-      const wave = Math.round(1.6 * Math.sin(x * 0.11 + t * 2.2) + 1.2 * Math.sin(x * 0.045 - t * 1.4));
+      const wave = Math.round(1.6 * (1 + hot * 0.6) * Math.sin(x * 0.11 + t * 2.2) + 1.2 * Math.sin(x * 0.045 - t * 1.4));
       const y = top - wave;
-      this.r(x, y, 2, 2, LAVA[0]);
-      this.r(x, y + 2, 2, 3, LAVA[1]);
-      this.r(x, y + 5, 2, 6, LAVA[2]);
-      this.r(x, y + 11, 2, 10, LAVA[3]);
-      this.r(x, y + 21, 2, this.bh, LAVA[4]);
+      this.r(x, y, 2, 2, LV[0]);
+      this.r(x, y + 2, 2, 3, LV[1]);
+      this.r(x, y + 5, 2, 6, LV[2]);
+      this.r(x, y + 11, 2, 10, LV[3]);
+      this.r(x, y + 21, 2, this.bh, LV[4]);
+    }
+    // Heat shimmer: rows just above the surface wobble sideways.
+    if (!this.calm) {
+      b.globalAlpha = 0.16;
+      for (let i = 0; i < 5; i++) {
+        for (let x = 0; x < this.bw; x += 7) {
+          if (Math.sin(x * 0.37 + this.time * 5 + i * 1.9) > 0.25) this.r(x + Math.round(Math.sin(this.time * 3 + i) * 2), top - 4 - i * 3, 5, 1, '#ffd08a');
+        }
+      }
+      b.globalAlpha = 1;
     }
     // Bubbles that swell and pop.
-    for (let i = 0; i < Math.ceil(this.bw / 40); i++) {
+    for (let i = 0; i < Math.ceil(this.bw / (hot > 0.5 ? 22 : 40)); i++) {
       const ph = (t * (0.5 + hashFrac(i, 3) * 0.6) + hashFrac(i, 8)) % 1;
       const x = Math.floor(hashFrac(i, Math.floor(t * (0.5 + hashFrac(i, 3) * 0.6) + hashFrac(i, 8))) * this.bw);
       const rad = 1 + Math.floor(ph * 3);
-      if (ph < 0.85) this.ring(x, top + 4, rad, LAVA[0]);
-      else for (let s = 0; s < 4; s++) this.r(x + (s - 1.5) * 3, top - 2 - (ph - 0.85) * 30, 1, 1, LAVA[0]);
+      if (ph < 0.85) this.ring(x, top + 4, rad, LV[0]);
+      else for (let s = 0; s < 4; s++) this.r(x + (s - 1.5) * 3, top - 2 - (ph - 0.85) * 30, 1, 1, LV[0]);
     }
   }
 
@@ -979,7 +1033,17 @@ export class Renderer {
     const { b } = this;
     const w = Math.round(p.w / A);
     const left = cx - Math.floor(w / 2);
-    let [glow, lit, dark] = ZONES[zoneIndexAt(p.y / UNITS_PER_METER)].plat;
+    let [glow, lit, dark] = ZONES[this.sim ? this.sim.zoneAt(p.y / UNITS_PER_METER) : 0].plat;
+    if (p.kind === Kind.Crust) {
+      if (p.melt >= 0) {
+        // Melted: only a faint outline of where it was.
+        b.globalAlpha = 0.22;
+        this.r(left, top + 1, w, 1, '#ff7a1e');
+        b.globalAlpha = 1;
+        return;
+      }
+      [glow, lit, dark] = ['#4a3636', '#2e2023', '#1a1115'];
+    }
     if (p.kind === Kind.Crumble) [glow, lit, dark] = ['#c9a27a', '#8a6248', '#4f3628'];
     if (p.kind === Kind.Ice) [glow, lit, dark] = ['#ffffff', '#bfeaff', '#6fb6d9'];
 
@@ -1004,6 +1068,23 @@ export class Renderer {
     } else if (p.kind === Kind.Crumble) {
       // Loose blocks with gaps between them: one bounce and it's gone.
       for (let c = 4 + Math.floor(hashFrac(p.id, 98) * 3); c < w - 3; c += 6) this.r(left + c, top, 1, 5, '#1a0d0a');
+    } else if (p.kind === Kind.Crust) {
+      // Glowing cracks: more of them, and hotter, as it heats.
+      const HEAT = ['#7a2a14', '#c4481a', '#ff7a1e', '#ffd84a'];
+      const heat = Math.max(0, Math.min(3, p.heat));
+      const col = HEAT[heat];
+      for (let c = 2 + Math.floor(hashFrac(p.id, 97) * 3); c < w - 2; c += 5) {
+        const f = hashFrac(p.id, c + 60);
+        if (heat < 3 && f < 0.35 - heat * 0.1) continue;
+        this.r(left + c, top, 1, 2, col);
+        this.r(left + c + 1, top + 2, 1, 2, col);
+        if (heat >= 2) this.r(left + c, top + 4, 1, 1, col);
+      }
+      if (heat >= 2) {
+        b.globalAlpha = 0.18 + 0.08 * Math.sin(this.time * 9 + p.id) * (heat - 1);
+        this.r(left, top - 1, w, 1, col);
+        b.globalAlpha = 1;
+      }
     } else if (p.kind === Kind.Ice) {
       for (let c = 1; c < w - 1; c += 4) this.r(left + c, top + 4, 1, 1 + Math.floor(hashFrac(p.id, c + 40) * 4), '#dff6ff');
     }
@@ -1259,6 +1340,54 @@ export class Renderer {
     ctx.globalAlpha = 1;
   }
 
+  /** The full-width ledge at the Daily summit, drawn as the crater lip. */
+  private drawSummit(sim: Sim): void {
+    let p: Platform | null = null;
+    for (let i = sim.platforms.length - 1; i >= 0 && i > sim.platforms.length - 8; i--) if (sim.platforms[i].summit) p = sim.platforms[i];
+    if (!p || !this.visible(p.y, 200)) return;
+    const top = this.ay(p.y);
+    const { b } = this;
+    // Light spilling over the rim.
+    for (let i = 0; i < 5; i++) {
+      b.globalAlpha = 0.07 * (5 - i);
+      this.r(0, top - 10 - i * 8, this.bw, 8, '#ffb84a');
+    }
+    b.globalAlpha = 1;
+    const rock = ['#ffd84a', '#c4481a', '#2e2023', '#1a1115'];
+    this.r(0, top, this.bw, 1, rock[0]);
+    this.r(0, top + 1, this.bw, 2, rock[1]);
+    this.r(0, top + 3, this.bw, this.bh, rock[2]);
+    for (let x = 0; x < this.bw; x += 3) {
+      const f = hashFrac(x, 11);
+      if (f > 0.55) this.r(x, top + 4 + Math.floor(f * 20), 2, 1, rock[3]);
+      if (f < 0.25) this.r(x, top + 2, 1, 3, Math.floor(this.time * 6 + x) % 5 ? rock[1] : rock[0]);
+    }
+    // Jagged teeth along the rim.
+    for (let x = 0; x < this.bw; x += 5) {
+      const h = 2 + Math.floor(hashFrac(x, 23) * 5);
+      this.r(x, top - h, 3, h, rock[2]);
+      this.r(x, top - h, 3, 1, rock[1]);
+    }
+  }
+
+  /** The summit eruption: the ember is flung up and out of the top of the screen on a column of fire. */
+  private drawEruption(px: number, py: number, sim: Sim, k: number): void {
+    const t = this.erupt;
+    const rise = 120 * t + 700 * t * t;
+    this.drawPlayer(px, py + rise, sim, k);
+    const base = this.ay(py);
+    for (let i = 0; i < 3; i++) {
+      this.particles.push({
+        x: px + (Math.random() - 0.5) * 24, y: py + rise - Math.random() * 40, vx: (Math.random() - 0.5) * 2, vy: -1 - Math.random() * 2,
+        life: 0, max: 30 + Math.random() * 20, color: LAVA[i % 3], size: 1 + (i % 2), grav: 0.05,
+      });
+    }
+    if (t < 0.6) {
+      const w = Math.round(14 * (1 - t / 0.6) + 4);
+      this.r(this.ax(px) - w / 2, 0, w, base, t < 0.3 ? '#fff0a0' : LAVA[1]);
+    }
+  }
+
   /** Pip: a little ember with big eyes and a flame for hair. */
   private drawPlayer(px: number, py: number, sim: Sim, k: number): void {
     const { b } = this;
@@ -1295,6 +1424,13 @@ export class Renderer {
       const left = cx - 6 - wide;
       const top = feet - 1 - bh;
       const s = this.skin;
+      // The closer the lava, the brighter the ember glows.
+      const near = clamp01(1 - (py - sim.lavaY) / Math.max(1, sim.fallLimit));
+      if (near > 0.45) {
+        b.globalAlpha = 0.28 * ((near - 0.45) / 0.55) * (this.calm ? 1 : 0.8 + 0.2 * Math.sin(t * 14));
+        this.disc(cx, top + 5, 10, '#ffb84a');
+        b.globalAlpha = 1;
+      }
       b.drawImage(s.sprite, left, top, bw, bh);
       skinExtra((x, y, w, h, c) => this.r(x, y, w, h, c), s, left, top, bh, t);
       // Feet tuck in on the way up.

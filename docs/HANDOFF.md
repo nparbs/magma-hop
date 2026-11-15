@@ -1,8 +1,24 @@
 # Handoff
 
-Last updated 2026-11-14. Live is **v0.5.0** (commit c0494be), shipped 2026-11-14. Read ROADMAP.md for the plan and the decisions the owner has made, CLAUDE.md for the working rules, and docs/hosting.md for the server.
+Last updated 2026-11-14. Live is **v0.5.0** (commit c0494be), shipped 2026-11-14. **v0.6.0 is built on branch `v0.6-eruption`, not committed and not shipped.** Read ROADMAP.md for the plan and the decisions the owner has made, CLAUDE.md for the working rules, and docs/hosting.md for the server.
 
-## Where things stand
+## v0.6 (eruption), waiting on the owner
+
+ROADMAP.md lists what each feature does. What a developer needs:
+
+- **Sim (`src/sim/sim.ts`, `SIM_VERSION` 4).**
+  - Surges: `sim.surge` is `'none' | 'rumble' | 'rise' | 'hold' | 'ease'`, and `sim.fallLimit` is the current gap (280 down to `surgeLimit(m)`, which is 120 low down and wider high up so a route gap always fits). `sim.nextSurge` is the height in meters of the next one. Events: `rumble`, `surge`.
+  - Crust: `Kind.Crust` with `heat` (0 to 3) and `melt` (tick, or -1) on the platform. Events: `melt`, `reform`. `CRUST_ZONE` in `zones.ts` says where it replaces ice.
+  - Daily: `new Sim(seed, { daily })` and `replay(seed, log, ticks, { daily })`. `sim.summit` is the top in meters (0 in endless), from `summitMeters(seed)`. Use `sim.zoneAt(m)`, not `zoneIndexAt`, anywhere the page picks a zone, because the Daily squeezes the zones. A win sets `sim.won` and ends the run with cause `summit`.
+- **Server.** The Daily board order is in `order()` in `server/db.ts`: summit finishers first by `ticks`, then height. Board rows carry `ticks` and `cause`. The cause always comes from the server's replay, never from the page.
+- **Page.** Laury's eruption quips and the near-miss rule are in `updateHud` and the event loop in `main.ts`. The Daily's local best keeps the fastest summit time (`dailyTime`). The game-over line is `causeLine` in `cause-text.ts`.
+- **Checked:** 34 tests, typecheck, build, bot stats, `livecheck` (10), `laurycheck` (13), `musiccheck`, and screenshots of crust, a surge, the summit, the eruption, the win screen and the game-over line (desktop and 360x640).
+  - The three check scripts now mark Laury's tutorial as seen (or skip the surge) so they test what they mean to.
+- **Not checked:** nobody has played it. No sound has been heard. Shimmer and shake haven't been watched in motion. 640x360 wasn't looked at for the Daily HUD.
+- **Known small gaps:** the win screen plays the game-over music. The Daily board's "You: #1 with 1,750 m" line shows height, not time, for a summit finisher.
+- **Tuning risk:** surges make the game a lot harder (bot numbers in ROADMAP.md). Soften them in the Ice Cap first if the owner finds it too hard.
+
+## Where things stand (v0.5 and earlier)
 
 - **v0.5 is live** at https://magmahop.parbs.online. It has two features, both asked for by the owner on 2026-11-14. ROADMAP.md lists what each one does.
   - **Live climbers.** You can see other players who are in the same mode right now.
@@ -66,7 +82,8 @@ Last updated 2026-11-14. Live is **v0.5.0** (commit c0494be), shipped 2026-11-14
 ## Open
 
 - Owner playtest of v0.5 with a second player, and of Laury.
-- The questions in ROADMAP.md: ice ledges above the Ice Cap, whether quitting from the pause menu should count, the weekly reset time, and the Daily Climb's UTC changeover.
+- Owner playtest of v0.6, then commit, merge to `main` and ship when asked.
+- The questions in ROADMAP.md: whether quitting from the pause menu should count, the weekly reset time, and the Daily Climb's UTC changeover.
 - A tuning pass on hazards and ledge rates, waiting on more of the owner's play.
 - Adding Magma Hop to the parbs.online landing page.
 - Ideas the owner hasn't agreed to are in ROADMAP.md under "Later ideas". Don't propose shooting (the owner ruled it out).

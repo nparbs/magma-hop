@@ -3,7 +3,7 @@ import './style.css';
 
 import { Kind, PickupKind, Recorder, Sim, TICK_RATE, UNITS_PER_METER } from '../sim/sim';
 import { Bot } from '../sim/bot';
-import { ZONES, zoneIndexAt } from '../sim/zones';
+import { ZONES } from '../sim/zones';
 import { cleanName } from '../sim/names';
 import { LauryArt, Logo, Renderer, SKINS, skinAt, type Marker } from './render';
 import { Input } from './input';
@@ -12,7 +12,8 @@ import { Playback } from './playback';
 import { fetchBoard, fetchRun, finishRun, startRun, type Board, type Range } from './net';
 import { LiveClimbers, liveCounts } from './live';
 import { Laury } from './laury';
-import { AFTER, CHECK_IN, DAILY_START, MILESTONE, START, basicsTour, dailyTour, pick } from './laury-lines';
+import { AFTER, CHECK_IN, DAILY_START, MILESTONE, NEAR_MISS, RUMBLE, START, SUMMIT, SURGE_SURVIVED, basicsTour, dailyTour, pick } from './laury-lines';
+import { causeLine } from './cause-text';
 
 declare const __APP_VERSION__: string;
 
@@ -61,8 +62,17 @@ function dailyBest(day: string): number {
     return 0;
   }
 }
-function setDailyBest(day: string, meters: number): void {
-  store.set('dailyBest', JSON.stringify({ day, meters }));
+/** Today's fastest summit time in ticks, or 0 if the summit hasn't been reached today. */
+function dailyTime(day: string): number {
+  try {
+    const d = JSON.parse(store.get('dailyBest') ?? 'null');
+    return d && d.day === day ? Number(d.ticks) || 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+function setDailyBest(day: string, meters: number, ticks = 0): void {
+  store.set('dailyBest', JSON.stringify({ day, meters, ticks }));
 }
 const todayUtc = () => new Date().toISOString().slice(0, 10);
 
@@ -147,6 +157,11 @@ let lastKind: 'endless' | 'daily' = 'endless';
 let zoneShown = 0;
 let bestAnnounced = false;
 let dyingTimer = 0;
+/** Laury's eruption quips: rumbles this run, the last surge phase seen, and the lava near-miss state. */
+let rumbles = 0;
+let lastSurge = 'none';
+let nearLava = false;
+let lastNearMiss = -1e9;
 let topBoard: Board | null = null;
 let dailyBoard: Board | null = null;
 /** Your best Daily Climb today (or the day's #1), replayed alongside you. */
@@ -345,6 +360,12 @@ async function takeRun(): Promise<RunTicket | null> {
 }
 
 const fmt = (m: number) => `${m.toLocaleString('en-US')} m`;
+/** Ticks as m:ss.s, e.g. 3:07.4. */
+const fmtTime = (ticks: number) => {
+  const tenths = Math.floor((ticks * 10) / TICK_RATE);
+  const sec = Math.floor(tenths / 10);
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}.${tenths % 10}`;
+};
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 async function refreshMini(): Promise<void> {
@@ -367,7 +388,8 @@ async function refreshMini(): Promise<void> {
 
 function refreshDailyNote(): void {
   const best = dailyBest(todayUtc());
-  ui.dailyNote.textContent = best ? `Your best today: ${fmt(best)}` : 'One volcano for everyone today';
+  const time = dailyTime(todayUtc());
+  ui.dailyNote.textContent = time ? `Your fastest today: ${fmtTime(time)}` : best ? `Your best today: ${fmt(best)}` : 'One volcano for everyone today';
 }
 
 let boardRange: Range = 'all';
@@ -383,7 +405,7 @@ async function showBoard(range: Range = boardRange): Promise<void> {
     const watchBtn = (id: number | null) => (id ? `<button class="watch" data-id="${id}" aria-label="Watch this climb">▶</button>` : '');
     const when = boardRange === 'week' ? ' this week' : boardRange === 'daily' ? ' today' : '';
     ui.boardList.innerHTML = b.top.length
-      ? b.top.map((r) => `<li><span class="n">${esc(r.name)}</span><span>${fmt(r.meters)}</span>${watchBtn(r.id)}</li>`).join('')
+      ? b.top.map((r) => `<li><span class="n">${esc(r.name)}</span><span>${r.cause === 'summit' && r.ticks ? `Summit ${fmtTime(r.ticks)}` : fmt(r.meters)}</span>${watchBtn(r.id)}</li>`).join('')
       : `<li class="empty">Nobody yet${when}. Go climb!</li>`;
     const dayNote = boardRange === 'daily' ? `Daily Climb ${b.day} (UTC). ` : '';
     ui.boardMe.textContent = dayNote + (b.me ? `You: #${b.me.rank} with ${fmt(b.me.meters)}` : 'You have no ranked climb here yet.');
@@ -435,13 +457,16 @@ function toTitle(): void {
 }
 
 function resetWorld(seed: number): void {
-  sim = new Sim(seed);
+  sim = new Sim(seed, { daily: daily !== null });
   bot = null;
   watch = null;
   ghost = null;
   live.leave();
   laury.finish();
   nextCheckIn = 500;
+  rumbles = 0;
+  lastSurge = 'none';
+  nearLava = false;
   rec = new Recorder();
   prev = { x: sim.x, y: sim.y };
   renderer.snapCamera(sim.lavaY);
@@ -619,30 +644,27 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) pause();
 });
 
-const CAUSES: Record<string, string> = {
-  lava: 'Fell into the lava',
-  bat: 'Bitten by a fire bat',
-  wisp: 'Burned by a fire wisp',
-  rockfall: 'Flattened by a rockfall',
-  quit: 'You called it there',
-};
-
 function endRun(cause: string): void {
   if (mode !== 'play' && mode !== 'pause' && mode !== 'dying') return;
   const meters = sim.meters;
   const day = daily;
   const before = day ? dailyBest(day) : localBest;
-  const isBest = meters > before;
+  const won = sim.won && cause === 'summit';
+  // A Daily win is ranked by time, so the best is the fastest summit, not the height.
+  const timeBefore = day ? dailyTime(day) : 0;
+  const isBest = won ? timeBefore === 0 || sim.tick < timeBefore : meters > before;
   if (isBest) {
-    if (day) setDailyBest(day, meters);
+    if (day) setDailyBest(day, Math.max(meters, before), won ? sim.tick : timeBefore);
     else {
       localBest = meters;
       store.set('best', String(meters));
     }
   }
-  ui.cause.textContent = (day ? 'Daily Climb · ' : '') + (CAUSES[cause] ?? 'Run over');
-  ui.meters.textContent = fmt(meters);
-  ui.best.textContent = isBest ? (day ? 'Your best today!' : 'New personal best!') : `Your best${day ? ' today' : ''}: ${fmt(before)}`;
+  ui.cause.textContent = (day ? 'Daily Climb · ' : '') + (won ? 'Summit!' : causeLine(cause, meters));
+  ui.meters.textContent = won ? fmtTime(sim.tick) : fmt(meters);
+  ui.best.textContent = won
+    ? isBest ? 'Your fastest today!' : `Your fastest today: ${fmtTime(timeBefore)}`
+    : isBest ? (day ? 'Your best today!' : 'New personal best!') : `Your best${day ? ' today' : ''}: ${timeBefore ? `Summit ${fmtTime(timeBefore)}` : fmt(before)}`;
   ui.best.classList.toggle('new', isBest);
   ui.rank.textContent = run ? 'Checking your climb…' : 'Offline run: not ranked.';
   ui.again.textContent = day ? 'Try today’s again' : 'Climb again';
@@ -651,7 +673,8 @@ function endRun(cause: string): void {
   laury.finish();
   store.set('lastCause', cause);
   show('over');
-  if (isBest) sfx.best();
+  if (isBest && !won) sfx.best();
+  if (won && lauryOn) laury.say(lauryPick(SUMMIT));
 
   if (run && meters > 0) {
     const r = run;
@@ -705,6 +728,12 @@ function handleEvents(): void {
     else if (e.t === 'fake') sfx.fake();
     else if (e.t === 'stomp') sfx.stomp();
     else if (e.t === 'warn') sfx.warn();
+    else if (e.t === 'rumble') {
+      sfx.rumble();
+      if (mode === 'play' && lauryOn && (rumbles++ === 0 || Math.random() < 1 / 3)) laury.say(lauryPick(RUMBLE));
+    } else if (e.t === 'surge') sfx.surge();
+    else if (e.t === 'melt') sfx.melt();
+    else if (e.t === 'summit') sfx.fanfare();
     else if (e.t === 'strike') sfx.strike();
     else if (e.t === 'pickup') {
       sfx.pickup(e.kind === PickupKind.Shield);
@@ -746,12 +775,12 @@ function tick(): void {
   }
   if (sim.dead) {
     mode = 'dying';
-    dyingTimer = 1.3;
+    dyingTimer = sim.won ? 2.8 : 1.3;
   } else if (sim.tick >= MAX_TICKS) endRun('quit');
 }
 
 function updateHud(): void {
-  ui.height.textContent = fmt(sim.meters);
+  ui.height.textContent = sim.summit > 0 ? `${sim.meters.toLocaleString('en-US')} / ${fmt(sim.summit)}` : fmt(sim.meters);
   const now = sim.heightNow;
   const max = sim.meters;
   const bits: string[] = [];
@@ -784,7 +813,23 @@ function updateHud(): void {
     if (lauryOn && (mark <= 1000 || Math.random() < 0.5)) laury.say(MILESTONE[mark] ?? lauryPick(CHECK_IN).replace('{h}', fmt(mark)));
   }
 
-  const z = zoneIndexAt(max);
+  if (mode === 'play' && !sim.dead) {
+    // Laury on eruptions: a surge survived, and a close brush with the lava.
+    if (lastSurge !== 'none' && sim.surge === 'none' && lauryOn && Math.random() < 0.5) laury.say(lauryPick(SURGE_SURVIVED));
+    lastSurge = sim.surge;
+    const gap = (sim.y - sim.lavaY) / UNITS_PER_METER;
+    if (gap < 3) nearLava = true;
+    else if (nearLava && gap >= 10) {
+      nearLava = false;
+      const t = performance.now();
+      if (t - lastNearMiss >= 20000 && lauryOn) {
+        lastNearMiss = t;
+        laury.say(lauryPick(NEAR_MISS));
+      }
+    }
+  }
+
+  const z = sim.zoneAt(max);
   if (z > zoneShown) {
     zoneShown = z;
     banner(ZONES[z].name, ZONES[z].intro);
@@ -811,8 +856,9 @@ function music(): void {
   const m = sfx.music;
   if (!m) return;
   m.duck(mode === 'pause');
+  m.pulse = mode === 'play' && sim.surge !== 'none';
   if (mode === 'title') m.play('title');
-  else if (mode === 'play' || mode === 'watch' || mode === 'intro') m.play(`zone${zoneIndexAt(sim.meters)}`);
+  else if (mode === 'play' || mode === 'watch' || mode === 'intro') m.play(`zone${sim.zoneAt(sim.meters)}`);
   else if (mode === 'dying' || mode === 'over') m.play('over');
 }
 

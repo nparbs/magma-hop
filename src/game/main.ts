@@ -5,7 +5,7 @@ import { Kind, PickupKind, Recorder, Sim, TICK_RATE, UNITS_PER_METER } from '../
 import { Bot } from '../sim/bot';
 import { ZONES } from '../sim/zones';
 import { cleanName } from '../sim/names';
-import { LauryArt, Logo, Renderer, SKINS, skinAt, type Marker } from './render';
+import { LauryArt, Logo, Renderer, SKINS, skinAt, stoneUi, type Marker } from './render';
 import { Input } from './input';
 import { Sfx } from './audio';
 import { Playback } from './playback';
@@ -13,7 +13,7 @@ import { fetchBoard, fetchRun, finishRun, startRun, type Board, type Range } fro
 import { LiveClimbers, liveCounts } from './live';
 import { Laury } from './laury';
 import { AFTER, CHECK_IN, DAILY_START, MILESTONE, NEAR_MISS, RUMBLE, START, SUMMIT, SURGE_SURVIVED, basicsTour, dailyTour, pick } from './laury-lines';
-import { causeLine } from './cause-text';
+import { causeWord } from './cause-text';
 
 declare const __APP_VERSION__: string;
 
@@ -117,6 +117,13 @@ const ui = {
   liveNote: $('liveNote'),
 };
 $('ver').textContent = `v${__APP_VERSION__}`;
+
+// The carved-stone menus: the slab and grain are pixel art from render.ts, used by style.css.
+{
+  const stone = stoneUi();
+  document.documentElement.style.setProperty('--slab', `url(${stone.slab})`);
+  document.documentElement.style.setProperty('--grain', `url(${stone.grain})`);
+}
 
 const renderer = new Renderer(canvas);
 const logo = new Logo($<HTMLCanvasElement>('logoArt'));
@@ -391,11 +398,11 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 async function refreshMini(): Promise<void> {
   try {
     topBoard = await fetchBoard('all', PLAYER);
-    const rows = topBoard.top.slice(0, 5);
+    const rows = topBoard.top.slice(0, 3); // the full board is one tap away; three keep the title on one screen
     ui.mini.innerHTML = rows.length
       ? `<div class="head">Highest climbers</div>` +
         rows.map((r, i) => `<div class="r"><span>${i + 1}. ${esc(r.name)}</span><span>${fmt(r.meters)}</span></div>`).join('') +
-        (topBoard.me ? `<div class="r" style="color:var(--mint)"><span>You: #${topBoard.me.rank}</span><span>${fmt(topBoard.me.meters)}</span></div>` : '')
+        (topBoard.me ? `<div class="r" style="color:var(--gold)"><span>You: #${topBoard.me.rank}</span><span>${fmt(topBoard.me.meters)}</span></div>` : '')
       : `<div class="head">No climbers on the board yet. Be the first.</div>`;
     if (topBoard.me && topBoard.me.meters > localBest) {
       localBest = topBoard.me.meters;
@@ -681,7 +688,7 @@ function endRun(cause: string): void {
       store.set('best', String(meters));
     }
   }
-  ui.cause.textContent = (day ? 'Daily Climb · ' : '') + (won ? 'Summit!' : causeLine(cause, meters));
+  ui.cause.textContent = (day ? 'Daily Climb · ' : '') + (won ? 'Summit!' : causeWord(cause));
   ui.meters.textContent = won ? fmtTime(sim.tick) : fmt(meters);
   ui.best.textContent = won
     ? isBest ? 'Your fastest today!' : `Your fastest today: ${fmtTime(timeBefore)}`

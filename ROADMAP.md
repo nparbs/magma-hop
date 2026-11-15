@@ -198,6 +198,15 @@ All asked for by the owner on 2026-11-15.
 - [x] **More music.** 18 new songs (six per zone in the Magma Chamber, four or five elsewhere, three each for the title and run-over screens), and every song has a B section, so it plays A B A B. Each cue shuffles through all its songs before repeating. The title theme still plays first.
 - [ ] Owner playtest: the new songs and Ash's voice haven't been heard by anyone yet.
 
+## v0.8.1 — carved stone menus (2026-11-15)
+
+The owner asked for a more professional UI that still fits, and picked "carved stone tablets" from three directions.
+
+- [x] **Stone slabs.** Panels are basalt tablets with a chiselled groove and lava glowing through corner cracks: pixel art from `stoneUi()` in `render.ts`, used as a CSS 9-slice `border-image` (`--slab`) and a grain tile (`--grain`). One art pixel is `--sp` (2px, 3px on big screens).
+- [x] **One button family.** Embossed rock that glows orange from inside on hover and press; the main action is a molten slab. Teal is gone from the menus (gold and lit orange instead); the in-game ghost stays blue.
+- [x] Board rank badges (gold, silver, bronze), carved panel titles and name well, a stone bubble for Ash, "SCORCHED" over the height on game over, top 3 on the title's mini board so the title fits at 360x640 and 640x360.
+- [x] How to play cut to a third of its text.
+
 ## Later ideas (not agreed)
 
 - More hazards per zone.

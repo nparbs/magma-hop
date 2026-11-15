@@ -355,6 +355,85 @@ export class LauryArt {
   }
 }
 
+/** Art pixels in a stone slab's frame: the CSS `border-image` slice. */
+export const SLAB_EDGE = 10;
+
+/**
+ * The carved-stone menu look, drawn once as pixel art and handed to CSS as data URLs:
+ * - `slab`: a basalt tablet for panels (9-slice, SLAB_EDGE art pixels of frame) with a chiselled groove
+ *   and lava glowing through cracks at two corners.
+ * - `grain`: a see-through speckle tile laid over buttons and inputs so they read as rock.
+ */
+export function stoneUi(): { slab: string; grain: string } {
+  const E = SLAB_EDGE;
+  const N = E * 2 + 40;
+  const c = document.createElement('canvas');
+  c.width = c.height = N;
+  const g = c.getContext('2d')!;
+  const px = (x: number, y: number, col: string) => {
+    g.fillStyle = col;
+    g.fillRect(x, y, 1, 1);
+  };
+  const noise = (x: number, y: number) => {
+    let h = (x * 374761393 + y * 668265263) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  };
+  // Depth into the frame: 0 at the outer edge.
+  const depth = (x: number, y: number) => Math.min(x, y, N - 1 - x, N - 1 - y);
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const d = depth(x, y);
+      const n = noise(x, y);
+      // Which side this pixel faces: top/left catch the light, bottom/right fall in shadow.
+      const lit = Math.min(x, y) === d;
+      let col: string;
+      if (d === 0) col = '#0d0404';
+      else if (d === 1) col = lit ? '#6b4638' : '#160807';
+      else if (d < E - 3) col = n < 0.18 ? '#4a2e27' : n > 0.85 ? '#2a1714' : '#3a2420';
+      else if (d === E - 3) col = lit ? '#120605' : '#5a3a30'; // the chiselled groove: dark lip, lit floor
+      else if (d === E - 2) col = lit ? '#5a3a30' : '#120605';
+      else col = n < 0.08 ? '#2f1814' : n > 0.94 ? '#1e0e0b' : '#26130f';
+      px(x, y, col);
+    }
+  }
+  // Lava glowing through the frame: a crack at the top left, one at the bottom right (mirrored),
+  // and a cold dark one at the top right.
+  const crack: [number, number][] = [[1, 8], [2, 7], [2, 6], [3, 5], [4, 5], [5, 4], [5, 3], [6, 2], [7, 2], [8, 1]];
+  const glow = (pts: [number, number][], flip: boolean) => {
+    for (const [x, y] of pts) {
+      const [cx, cy] = flip ? [N - 1 - x, N - 1 - y] : [x, y];
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const ax = cx + dx;
+        const ay = cy + dy;
+        if (depth(ax, ay) >= 1 && depth(ax, ay) < E - 3) px(ax, ay, '#a8300f');
+      }
+    }
+    pts.forEach(([x, y], i) => {
+      const [cx, cy] = flip ? [N - 1 - x, N - 1 - y] : [x, y];
+      px(cx, cy, i > 2 && i < 7 ? '#ffd36a' : '#f0541a');
+    });
+  };
+  glow(crack, false);
+  glow(crack, true);
+  for (const [x, y] of [[N - 3, 6], [N - 4, 5], [N - 4, 4], [N - 5, 3], [N - 6, 2]] as [number, number][]) px(x, y, '#0d0404');
+
+  // The grain: dark and light flecks, mostly clear.
+  const t = document.createElement('canvas');
+  t.width = t.height = 16;
+  const tg = t.getContext('2d')!;
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      const n = noise(x + 101, y + 57);
+      if (n < 0.1) tg.fillStyle = 'rgba(0, 0, 0, 0.18)';
+      else if (n > 0.93) tg.fillStyle = 'rgba(255, 220, 190, 0.09)';
+      else continue;
+      tg.fillRect(x, y, 1, 1);
+    }
+  }
+  return { slab: c.toDataURL(), grain: t.toDataURL() };
+}
+
 export class Logo {
   /** The climber in the O: whichever skin is picked. */
   skin: Skin = SKINS[0];

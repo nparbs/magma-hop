@@ -5,7 +5,12 @@
   --edge: rgba(255, 176, 46, 0.35);
   --hot: #ffb02e;
   --hot2: #f0541a;
-  --mint: #6ff2e0;
+  /* Highlights (you, a new best, focus): molten gold, so the menus keep to one fire palette. */
+  --gold: #ffd36a;
+  /* One art pixel of the stone menus, in CSS pixels: 2, or 3 on big screens (see the media query by .panel). */
+  --sp: 2px;
+  --slab: none;
+  --grain: none;
   font-family: 'Jersey 15', system-ui, sans-serif;
   font-synthesis: none;
   font-size: 19px;
@@ -141,7 +146,7 @@ button {
   transform: translateX(-50%) scale(0.8);
   font-size: 28px;
   font-weight: 700;
-  color: var(--mint);
+  color: var(--gold);
   opacity: 0;
   transition: opacity 0.3s, transform 0.3s;
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
@@ -206,18 +211,40 @@ button {
   z-index: 5;
 }
 
+/* A carved basalt tablet: the slab from render.ts (stoneUi) as a pixel 9-slice frame. */
 .panel {
-  width: min(400px, 100%);
+  width: min(420px, 100%);
   max-height: calc(100% - 8px);
   overflow-y: auto;
-  background: var(--panel);
-  border: 2px solid var(--edge);
-  border-radius: 6px;
-  padding: 22px 22px 18px;
+  scrollbar-width: thin;
+  scrollbar-color: #5a3a30 transparent;
+  background: #26130f;
+  border: calc(10 * var(--sp)) solid #3a2420;
+  border-image: var(--slab) 10 fill / calc(10 * var(--sp)) round;
+  image-rendering: pixelated;
+  padding: 8px 10px 6px;
   text-align: center;
-  backdrop-filter: blur(3px);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 calc(3 * var(--sp)) 0 rgba(0, 0, 0, 0.55), 0 24px 60px rgba(0, 0, 0, 0.5);
   margin: auto;
+}
+
+@media (min-width: 900px) and (min-height: 880px) {
+  :root {
+    --sp: 3px;
+  }
+}
+
+@media (max-width: 480px), (max-height: 480px) {
+  .panel-wrap {
+    padding: 10px;
+  }
+}
+
+/* Panel titles carved into the stone: gold, with a dark cut above and a lit lip below. */
+h2 {
+  color: var(--gold);
+  text-shadow: 0 -2px 0 #0d0404, 0 2px 0 #7a2a0a;
+  letter-spacing: 1px;
 }
 
 .logo {
@@ -295,14 +322,18 @@ h2 {
   margin-bottom: 14px;
 }
 
+/* Carved into the slab: a sunken well, dark lip on top, lit edge below. */
 .name-row input {
   display: block;
   width: 100%;
   margin-top: 5px;
-  padding: 10px 14px;
-  border-radius: 4px;
-  border: 1px solid var(--edge);
-  background: rgba(255, 255, 255, 0.08);
+  padding: 8px 14px;
+  border-radius: 0;
+  border: 2px solid #0d0404;
+  background: var(--grain) 0 0 / calc(16 * var(--sp)) #170907;
+  image-rendering: pixelated;
+  box-shadow: inset 0 3px 0 rgba(0, 0, 0, 0.5), 0 2px 0 #5a3a30;
+  outline: none;
   color: var(--ink);
   font: inherit;
   font-size: 23px;
@@ -310,25 +341,38 @@ h2 {
   -webkit-user-select: text;
 }
 
+.name-row input:focus {
+  border-color: var(--hot);
+}
+
 /* ---------- Buttons: one family, three sizes ----------
-   Every button is a block of basalt with a 2px edge and a hard shadow underneath that it presses into.
-   .big-btn is the one main action on a panel (lava orange), .btn the rest, .chip the small ones. */
+   Every button is an embossed block of basalt: grain from render.ts (stoneUi), a dark outline, a lit top
+   edge, a shaded bottom edge and a hard shadow underneath that it presses into. Hover and press light it
+   from inside like lava under the rock. .big-btn is the one main action on a panel (molten), .btn the rest,
+   .chip the small ones. */
 .big-btn,
 .btn,
 .chip,
 .skin-arrow,
 .tab,
-.icon-btn {
-  --face: #3a1a16;
-  --rim: #74361f;
-  --base: #120505;
+.icon-btn,
+.board-list .watch {
+  --face: #3a2420;
+  --rim: #0d0404;
+  --base: #0d0404;
+  --hi: #6b4638;
+  --lo: #1c0d0a;
   --lift: 3px;
-  background: var(--face);
+  --glow: 0 0 0 transparent;
+  color: var(--ink);
+  background: var(--grain) 0 0 / calc(16 * var(--sp)) var(--face);
+  image-rendering: pixelated;
   border: 2px solid var(--rim);
-  border-radius: 4px;
-  box-shadow: 0 var(--lift) 0 var(--base);
+  border-radius: 0;
+  box-shadow: inset 0 2px 0 var(--hi), inset 0 -3px 0 var(--lo), 0 var(--lift) 0 var(--base), var(--glow);
   font-weight: 600;
-  transition: transform 0.06s, box-shadow 0.06s, background 0.1s, border-color 0.1s;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+  transition: transform 0.06s, box-shadow 0.08s, background-color 0.1s, color 0.1s;
 }
 
 .big-btn:hover,
@@ -336,9 +380,13 @@ h2 {
 .chip:hover,
 .skin-arrow:hover,
 .tab:hover,
-.icon-btn:hover {
-  --face: #4c231c;
-  --rim: #b0542a;
+.icon-btn:hover,
+.board-list .watch:hover {
+  --face: #4a2a20;
+  --hi: #c2602a;
+  --lo: #6a1c0a;
+  --glow: 0 0 10px rgba(255, 110, 30, 0.3);
+  color: #fff3d6;
 }
 
 .big-btn:active,
@@ -346,9 +394,14 @@ h2 {
 .chip:active,
 .skin-arrow:active,
 .tab:active,
-.icon-btn:active {
+.icon-btn:active,
+.board-list .watch:active {
   transform: translateY(calc(var(--lift) - 1px));
-  box-shadow: 0 1px 0 var(--base);
+  --face: #5a2a18;
+  --hi: #ff9a2e;
+  --lo: #8a2a0c;
+  --glow: 0 0 14px rgba(255, 120, 30, 0.45);
+  box-shadow: inset 0 2px 0 var(--hi), inset 0 -3px 0 var(--lo), 0 1px 0 var(--base), var(--glow);
 }
 
 .big-btn:focus-visible,
@@ -356,27 +409,37 @@ h2 {
 .chip:focus-visible,
 .skin-arrow:focus-visible,
 .tab:focus-visible {
-  outline: 2px solid var(--mint);
+  outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
 
+/* The main action: molten rock in a dark stone rim, banded like the logo's letters. */
 .big-btn {
   --lift: 5px;
-  --rim: #ffc85a;
-  --base: #7a120a;
+  --hi: #fff0a0;
+  --lo: #b3260f;
+  --base: #4a0c06;
   display: block;
   width: 100%;
-  padding: 12px;
+  padding: 11px 12px 13px;
   margin-bottom: 14px;
   font-size: 28px;
   font-weight: 700;
+  letter-spacing: 1px;
   color: #2a0d05;
-  background: linear-gradient(180deg, var(--hot), var(--hot2));
+  text-shadow: 0 1px 0 rgba(255, 240, 180, 0.6);
+  background:
+    linear-gradient(180deg, #ffd36a 0 22%, #ffb02e 22% 50%, #ff8a1e 50% 78%, #f0541a 78%);
 }
 
-.big-btn:hover {
-  --rim: #fff0a0;
-  background: linear-gradient(180deg, #ffc24a, #ff6a2a);
+.big-btn:hover,
+.big-btn:active {
+  --hi: #fffbe0;
+  --lo: #c8300f;
+  --glow: 0 0 18px rgba(255, 150, 40, 0.55);
+  color: #2a0d05;
+  background:
+    linear-gradient(180deg, #ffe08a 0 22%, #ffc24a 22% 50%, #ff9a2a 50% 78%, #ff6a2a 78%);
 }
 
 .panel > .big-btn:last-child {
@@ -406,17 +469,14 @@ h2 {
   }
 }
 
+/* The second way to play: stone with an ember seam along its top, gold lettering. */
 .daily-btn {
   display: block;
   width: 100%;
   margin-bottom: 12px;
   font-size: 22px;
-  color: var(--mint);
-  --rim: #2f8a80;
-}
-
-.daily-btn:hover {
-  --rim: var(--mint);
+  color: var(--gold);
+  --hi: #c2602a;
 }
 
 .daily-btn small {
@@ -446,20 +506,25 @@ h2 {
 .watch-bar span {
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--mint);
+  color: var(--gold);
 }
 
 .board-list li .watch {
-  margin-left: 8px;
-  padding: 0 8px;
-  border-radius: 4px;
-  background: rgba(111, 242, 224, 0.15);
-  color: var(--mint);
+  --lift: 2px;
+  margin-left: 10px;
+  padding: 2px 9px 3px;
+  color: var(--hot);
   font-size: 15px;
 }
 
-.board-list li .watch:hover {
-  background: rgba(111, 242, 224, 0.3);
+/* The look arrows beside the logo glow orange on their stone. */
+.skin-arrow,
+.skin-arrow:hover {
+  color: var(--hot);
+}
+
+.tag {
+  text-wrap: balance;
 }
 
 body.calm .laury,
@@ -591,7 +656,7 @@ body.calm .toggle.on::before {
 .live-note {
   margin: -4px 0 10px;
   font-size: 16px;
-  color: var(--mint);
+  color: var(--gold);
 }
 
 .mini-board {
@@ -608,12 +673,15 @@ body.calm .toggle.on::before {
   margin-bottom: 4px;
 }
 
+/* Rows are cut into the stone: a dark groove with a lit lip under each one. */
 .mini-board div.r,
 .board-list li {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   padding: 3px 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid #120605;
+  box-shadow: 0 1px 0 rgba(107, 70, 56, 0.45);
 }
 
 .ver {
@@ -650,11 +718,15 @@ body.calm .toggle.on::before {
   padding: 6px;
 }
 
-.tab.active {
-  --face: var(--mint);
-  --rim: #b8fff6;
-  --base: #1f6b63;
-  color: #0c2a2a;
+/* The open tab is lit from inside, like a switch that's on. */
+.tab.active,
+.tab.active:hover {
+  --face: #5a2a18;
+  --hi: #ff9a2e;
+  --lo: #8a2a0c;
+  --glow: 0 0 12px rgba(255, 110, 30, 0.35);
+  color: var(--gold);
+  text-shadow: 0 0 6px rgba(255, 150, 40, 0.7);
 }
 
 .board-list {
@@ -672,28 +744,43 @@ body.calm .toggle.on::before {
   padding: 6px 4px;
 }
 
+/* The rank: a small carved badge. Gold, silver and bronze for the top three. */
 .board-list li::before {
-  content: counter(r) '.';
-  width: 2.2em;
+  content: counter(r);
+  flex: none;
+  min-width: 1.6em;
+  margin-right: 10px;
+  padding: 1px 4px 2px;
+  text-align: center;
+  font-size: 16px;
   color: var(--dim);
+  background: #170907;
+  border: 2px solid #0d0404;
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.45), 0 1px 0 #5a3a30;
+}
+
+.board-list li:nth-child(1)::before {
+  color: #3a1a04;
+  background: linear-gradient(180deg, #fff0a0 0 30%, #ffd36a 30% 70%, #e8a020 70%);
+  box-shadow: 0 0 8px rgba(255, 200, 80, 0.4);
+}
+
+.board-list li:nth-child(2)::before {
+  color: #23262e;
+  background: linear-gradient(180deg, #ffffff 0 30%, #d8dce8 30% 70%, #9aa0b0 70%);
+  box-shadow: none;
+}
+
+.board-list li:nth-child(3)::before {
+  color: #2e1406;
+  background: linear-gradient(180deg, #ffc890 0 30%, #e8a66a 30% 70%, #b0683a 70%);
+  box-shadow: none;
 }
 
 .board-list li .n {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.board-list li:nth-child(1) .n {
-  color: #ffd84a;
-}
-
-.board-list li:nth-child(2) .n {
-  color: #e3e8f5;
-}
-
-.board-list li:nth-child(3) .n {
-  color: #e8a66a;
 }
 
 .board-list .empty {
@@ -706,7 +793,7 @@ body.calm .toggle.on::before {
 }
 
 .board-me {
-  color: var(--mint);
+  color: var(--gold);
   font-weight: 600;
   margin-bottom: 12px;
   min-height: 1.2em;
@@ -715,6 +802,8 @@ body.calm .toggle.on::before {
 .cause {
   color: var(--dim);
   font-size: 23px;
+  text-transform: uppercase;
+  letter-spacing: 3px;
 }
 
 .meters {
@@ -731,7 +820,7 @@ body.calm .toggle.on::before {
 }
 
 .best.new {
-  color: var(--mint);
+  color: var(--gold);
 }
 
 .rank {
@@ -860,29 +949,34 @@ body.calm .toggle.on::before {
 .laury-bubble {
   position: relative;
   margin-top: 18px;
-  padding: 7px 12px 9px;
-  background: var(--panel);
-  border: 2px solid var(--hot);
-  border-radius: 6px;
+  padding: 7px 12px 10px;
+  /* A small stone tablet like the menus, with an ember seam along the top. */
+  background: var(--grain) 0 0 / calc(16 * var(--sp)) #2a1612;
+  image-rendering: pixelated;
+  border: 2px solid #0d0404;
+  border-radius: 0;
   font-size: 18px;
   line-height: 1.15;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 2px 0 #c2602a, inset 0 -3px 0 #1c0d0a, 0 3px 0 #0d0404, 0 10px 30px rgba(0, 0, 0, 0.45);
 }
 
-/* The tail, pointing at her. */
+/* The tail, pointing at her: a stepped pixel wedge. */
 .laury-bubble::before {
   content: '';
   position: absolute;
-  right: -10px;
+  right: -12px;
   top: 12px;
-  border: 5px solid transparent;
-  border-left-color: var(--hot);
+  width: 4px;
+  height: 4px;
+  background: #0d0404;
+  box-shadow: 4px 2px 0 #0d0404, 8px 4px 0 #0d0404, 0 4px 0 #0d0404, 4px 6px 0 #0d0404;
 }
 
 .laury-bubble b {
   display: block;
   font-size: 15px;
-  color: var(--hot);
+  letter-spacing: 1px;
+  color: var(--gold);
 }
 
 /* Tutorial buttons on the right edge, halfway down, where a right thumb rests on a phone.
@@ -907,8 +1001,6 @@ body.calm .toggle.on::before {
   min-height: 48px;
   font-size: 18px;
   padding: 6px 14px;
-  background: var(--panel);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
 }
 
 .laury-btns #lauryNext {

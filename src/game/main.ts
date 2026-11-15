@@ -173,8 +173,16 @@ renderer.snapCamera(sim.lavaY);
 ui.name.value = store.get('name') ?? '';
 ui.name.addEventListener('change', () => store.set('name', ui.name.value.trim()));
 
+/** A settings switch: lit in fire when on, burnt-out ash when off. */
+function setToggle(b: HTMLElement, on: boolean, label: string): void {
+  b.textContent = label;
+  b.classList.add('toggle');
+  b.classList.toggle('on', on);
+  b.classList.toggle('off', !on);
+}
+
 sfx.setMuted(store.get('muted') === '1');
-const soundLabel = () => (ui.sound.textContent = sfx.muted ? 'Sound off' : 'Sound on');
+const soundLabel = () => setToggle(ui.sound, !sfx.muted, sfx.muted ? 'Sound off' : 'Sound on');
 soundLabel();
 ui.sound.addEventListener('click', () => {
   sfx.setMuted(!sfx.muted);
@@ -188,7 +196,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 sfx.setMusic(store.get('music') !== '0');
-const musicLabel = () => (ui.music.textContent = sfx.musicOn ? 'Music on' : 'Music off');
+const musicLabel = () => setToggle(ui.music, sfx.musicOn, sfx.musicOn ? 'Music on' : 'Music off');
 musicLabel();
 ui.music.addEventListener('click', () => {
   sfx.unlock();
@@ -203,7 +211,7 @@ let calm = calmSaved === null ? matchMedia('(prefers-reduced-motion: reduce)').m
 const applyCalm = () => {
   renderer.calm = calm;
   document.body.classList.toggle('calm', calm);
-  ui.calm.textContent = calm ? 'Calm effects on' : 'Calm effects off';
+  setToggle(ui.calm, calm, calm ? 'Calm effects on' : 'Calm effects off');
 };
 applyCalm();
 ui.calm.addEventListener('click', () => {
@@ -236,14 +244,14 @@ for (const [id, d] of [['skinPrev', -1], ['skinNext', 1]] as const) {
 // iPhones only allow it after asking, from a tap.
 if ('ontouchstart' in window && 'DeviceOrientationEvent' in window) {
   const label = () => {
-    for (const b of [ui.tilt, ui.pauseTilt]) b.textContent = input.tiltOn ? 'Tilt on' : 'Tilt off';
+    for (const b of [ui.tilt, ui.pauseTilt]) setToggle(b, input.tiltOn, input.tiltOn ? 'Tilt on' : 'Tilt off');
   };
   for (const b of [ui.tilt, ui.pauseTilt]) {
     b.classList.remove('hidden');
     b.addEventListener('click', async () => {
       if (input.tiltOn) input.tiltOn = false;
       else if (!(await input.enableTilt())) {
-        b.textContent = 'Tilt not allowed';
+        setToggle(b, false, 'Tilt not allowed');
         return;
       }
       store.set('tilt', input.tiltOn ? '1' : '0');
@@ -259,7 +267,7 @@ if ('ontouchstart' in window && 'DeviceOrientationEvent' in window) {
 const live = new LiveClimbers();
 let liveOn = store.get('live') !== '0';
 const liveLabel = () => {
-  for (const b of [ui.live, ui.pauseLive]) b.textContent = liveOn ? 'Others on' : 'Others off';
+  for (const b of [ui.live, ui.pauseLive]) setToggle(b, liveOn, liveOn ? 'Others on' : 'Others off');
 };
 liveLabel();
 for (const b of [ui.live, ui.pauseLive]) {
@@ -298,7 +306,7 @@ const laury = new Laury(
 );
 let lauryOn = store.get('laury') !== '0';
 const lauryLabel = () => {
-  for (const id of ['lauryBtn', 'pauseLaury']) $(id).textContent = lauryOn ? 'Laury on' : 'Laury off';
+  for (const id of ['lauryBtn', 'pauseLaury']) setToggle($(id), lauryOn, lauryOn ? 'Laury on' : 'Laury off');
 };
 lauryLabel();
 for (const id of ['lauryBtn', 'pauseLaury']) {
@@ -408,7 +416,7 @@ async function showBoard(range: Range = boardRange): Promise<void> {
       ? b.top.map((r) => `<li><span class="n">${esc(r.name)}</span><span>${r.cause === 'summit' && r.ticks ? `Summit ${fmtTime(r.ticks)}` : fmt(r.meters)}</span>${watchBtn(r.id)}</li>`).join('')
       : `<li class="empty">Nobody yet${when}. Go climb!</li>`;
     const dayNote = boardRange === 'daily' ? `Daily Climb ${b.day} (UTC). ` : '';
-    ui.boardMe.textContent = dayNote + (b.me ? `You: #${b.me.rank} with ${fmt(b.me.meters)}` : 'You have no ranked climb here yet.');
+    ui.boardMe.textContent = dayNote + (b.me ? `You: #${b.me.rank} with ${b.me.cause === 'summit' && b.me.ticks ? `a ${fmtTime(b.me.ticks)} summit` : fmt(b.me.meters)}` : 'You have no ranked climb here yet.');
   } catch {
     ui.boardList.innerHTML = `<li class="empty">Can't reach the board right now.</li>`;
   }
@@ -859,7 +867,7 @@ function music(): void {
   m.pulse = mode === 'play' && sim.surge !== 'none';
   if (mode === 'title') m.play('title');
   else if (mode === 'play' || mode === 'watch' || mode === 'intro') m.play(`zone${sim.zoneAt(sim.meters)}`);
-  else if (mode === 'dying' || mode === 'over') m.play('over');
+  else if (mode === 'dying' || mode === 'over') m.play(sim.won ? 'summit' : 'over');
 }
 
 let padHeld = false;

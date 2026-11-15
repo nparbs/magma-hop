@@ -1,6 +1,6 @@
 // Every sound is synthesized here, music included. No audio files.
 
-import { OVER_SONG, TITLE_SONG, ZONE_SONGS, type Song } from './songs';
+import { OVER_SONG, SUMMIT_SONG, TITLE_SONG, ZONE_SONGS, type Song } from './songs';
 
 export class Sfx {
   private ctx: AudioContext | null = null;
@@ -182,7 +182,7 @@ const ZONE_LOOPS = 4;
 const midiHz = (n: number) => 440 * Math.pow(2, (n - 69) / 12);
 
 /** What should be playing: the title theme, the run-over theme, or a zone's songs. */
-export type MusicCue = 'title' | 'over' | `zone${number}`;
+export type MusicCue = 'title' | 'over' | 'summit' | `zone${number}`;
 
 interface Track {
   cue: MusicCue;
@@ -249,6 +249,7 @@ export class Music {
   private pick(cue: MusicCue): Song {
     if (cue === 'title') return TITLE_SONG;
     if (cue === 'over') return OVER_SONG;
+    if (cue === 'summit') return SUMMIT_SONG;
     const i = Math.max(0, Math.min(ZONE_SONGS.length - 1, Number(cue.slice(4)) || 0));
     const list = ZONE_SONGS[i];
     const last = this.lastPick.get(cue);

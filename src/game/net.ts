@@ -15,7 +15,7 @@ export interface BoardEntry {
 
 export interface Board {
   top: BoardEntry[];
-  me: { id: number; meters: number; rank: number } | null;
+  me: { id: number; meters: number; ticks?: number; cause?: string; rank: number } | null;
   day: string;
 }
 

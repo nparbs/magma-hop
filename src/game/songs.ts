@@ -64,6 +64,16 @@ export const OVER_SONG: Song = {
   leadWave: 'triangle', leadOct: 2,
 };
 
+/** Plays on the win screen after reaching the Daily summit. */
+export const SUMMIT_SONG: Song = {
+  name: 'Summit', bpm: 120, root: 43, scale: MAJOR, prog: [0, 3, 4, 0],
+  bass: 'x...x.o.x...x.5.', bassWave: 'triangle',
+  arp: '0.1.2.3.2.1.2.3.', arpWave: 'sine', arpOct: 2, pad: true,
+  kick: 'x.......x.......', snare: '....x.......x...', hat: '..x...x...x...x.',
+  lead: bars('4-5-7---9---7---', '5-7-8---7-------', '4-5-7---9-8-7-9-', '7---------------'),
+  leadWave: 'square', leadOct: 2,
+};
+
 /** In ZONES order: a few songs per zone, busier the higher you go. */
 export const ZONE_SONGS: Song[][] = [
   // Magma Chamber
@@ -177,4 +187,4 @@ export const ZONE_SONGS: Song[][] = [
   ],
 ];
 
-export const ALL_SONGS: Song[] = [TITLE_SONG, OVER_SONG, ...ZONE_SONGS.flat()];
+export const ALL_SONGS: Song[] = [TITLE_SONG, OVER_SONG, SUMMIT_SONG, ...ZONE_SONGS.flat()];

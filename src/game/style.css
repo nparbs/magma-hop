@@ -435,6 +435,77 @@ body.calm .big-btn {
   font-size: 18px;
 }
 
+/* Settings switches: a pixel flame when on, a heap of ash with one dying ember when off.
+   The sprites are 3px "art pixels" drawn with box-shadow (cell 0,0 stays empty). */
+.chip.toggle {
+  position: relative;
+  padding-left: 36px;
+}
+
+.chip.toggle::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  margin-top: -10px;
+  width: 3px;
+  height: 3px;
+}
+
+.chip.toggle.on {
+  color: #fff3d6;
+  border-color: #ff9a2e;
+  background: linear-gradient(180deg, rgba(255, 140, 40, 0.28), rgba(200, 40, 20, 0.38));
+  box-shadow: 0 0 10px rgba(255, 110, 30, 0.45), inset 0 -2px 0 rgba(255, 200, 80, 0.25);
+  text-shadow: 0 0 6px rgba(255, 150, 40, 0.8);
+}
+
+.chip.toggle.on:hover {
+  background: linear-gradient(180deg, rgba(255, 150, 50, 0.38), rgba(210, 50, 20, 0.48));
+}
+
+.chip.toggle.on::before {
+  box-shadow:
+    6px 0 #e8401c, 3px 3px #e8401c, 6px 3px #ffa024,
+    3px 6px #e8401c, 6px 6px #ffa024, 9px 6px #e8401c,
+    0 9px #e8401c, 3px 9px #ffa024, 6px 9px #fff3b0, 9px 9px #ffa024, 12px 9px #e8401c,
+    0 12px #e8401c, 3px 12px #ffa024, 6px 12px #fff3b0, 9px 12px #fff3b0, 12px 12px #e8401c,
+    3px 15px #e8401c, 6px 15px #e8401c, 9px 15px #e8401c;
+  animation: flicker 0.5s steps(1) infinite;
+}
+
+@keyframes flicker {
+  50% {
+    box-shadow:
+      9px 0 #e8401c, 6px 3px #ffa024, 9px 3px #e8401c,
+      3px 6px #e8401c, 6px 6px #ffa024, 9px 6px #e8401c,
+      0 9px #e8401c, 3px 9px #ffa024, 6px 9px #fff3b0, 9px 9px #ffa024, 12px 9px #e8401c,
+      0 12px #e8401c, 3px 12px #ffa024, 6px 12px #fff3b0, 9px 12px #fff3b0, 12px 12px #e8401c,
+      3px 15px #e8401c, 6px 15px #e8401c, 9px 15px #e8401c;
+  }
+}
+
+.chip.toggle.off {
+  color: #9c938d;
+  border-color: rgba(140, 130, 124, 0.4);
+  background: rgba(50, 46, 44, 0.55);
+}
+
+.chip.toggle.off:hover {
+  background: rgba(70, 64, 60, 0.65);
+}
+
+.chip.toggle.off::before {
+  box-shadow:
+    6px 9px #8d8580,
+    3px 12px #8d8580, 6px 12px #57504c, 9px 12px #a8441c, 12px 12px #8d8580,
+    0 15px #57504c, 3px 15px #8d8580, 6px 15px #57504c, 9px 15px #8d8580, 12px 15px #57504c;
+}
+
+body.calm .chip.toggle.on::before {
+  animation: none;
+}
+
 .live-note {
   margin: -4px 0 10px;
   font-size: 16px;
@@ -636,6 +707,12 @@ body.calm .big-btn {
   .chip {
     padding: 3px 12px;
     font-size: 16px;
+  }
+  .chip.toggle {
+    padding-left: 32px;
+  }
+  .chip.toggle::before {
+    left: 10px;
   }
   .big-btn {
     padding: 6px;

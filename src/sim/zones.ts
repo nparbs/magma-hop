@@ -72,7 +72,7 @@ export function zoneIndexAt(meters: number): number {
 /** Where each hazard and platform trick starts, in meters. */
 export const FEATURE = {
   pickups: 100,
-  bats: 150,
+  bats: 200,
   moving: 220,
   crumble: 300,
   fakes: 350,

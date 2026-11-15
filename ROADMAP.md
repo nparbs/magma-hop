@@ -151,7 +151,7 @@ Asked for by the owner on 2026-11-14, to lean into the volcano theme.
 - [x] **Heat feel.** Shimmer above the lava (off with calm effects), the ember glows brighter as the lava gets close, shake during a rumble, a music pulse layer during a surge, and rumble, surge, sizzle and fanfare sounds.
 - [x] **Laury and naming.** Laury has lines for a rumble, a surge survived, a near miss and the summit. The game-over screen names the cause: "Scorched at 840 m" (`src/game/cause-text.ts`).
 - [x] `SIM_VERSION` is 4. Runs stored under 3 keep their heights on the board but can no longer be watched (the board hides their watch button).
-- [ ] Owner playtest. Surges are the big difficulty change: the no-hazards bot still passes 1 km every run, but most of its runs now end in the Ice Cap (1.4 to 1.9 km), and the careful bot reached the Daily summit on 3 of 12 seeds. If it plays too hard, soften surges in the Ice Cap first.
+- [x] Owner playtest (2026-11-15): too punishing early, softened in v0.7.1. Earlier note: surges are the big difficulty change: the no-hazards bot still passes 1 km every run, but most of its runs now end in the Ice Cap (1.4 to 1.9 km), and the careful bot reached the Daily summit on 3 of 12 seeds. If it plays too hard, soften surges in the Ice Cap first.
 
 ## v0.7 — looks (live since 2026-11-14)
 
@@ -160,6 +160,27 @@ Asked for by the owner on 2026-11-14. The owner picked "zone materials" and "set
 - [x] **Zone ledges.** Cracked and drifting ledges are made of their zone's material. Cracked: cooled lava blocks with glowing seams, crystal shards, brittle ribs, a thin snow crust, cinder blocks, packed ash flaking away. Drifting: the chamber's rock on sparks, a floating crystal over a glow, a bone raft shedding dust, an ice floe on steam, a smoking pumice raft, a cinder puff. The tells stay the same in every zone: cracked ledges show gaps between their pieces, drifting ones have something under them. Fakes are unchanged. Cosmetic only, no sim change.
 - [x] **Home screen and buttons.** One button family: every button is a basalt block with a 2px edge and a hard shadow it presses into. Three sizes: the lava-orange main action on each panel, normal buttons, and small chips. The board tabs and pause button use it too.
 - [x] **Settings panel.** The title shows Climb, Daily Climb and Board / How to play / Settings. Settings is one panel, opened from the title or the pause menu: Sound, Music, Calm effects, Tilt to steer (phones), Show others climbing and Laury, each a row lit in fire when on and burnt ash when off, plus Laury's tutorial button. Escape closes it first. The home screen now fits at 360x640 and 640x360.
+
+## v0.7.1 — gentler start (live since 2026-11-15)
+
+Owner playtest, 2026-11-15: surges and the early bats were too punishing. Make the climb to 1,000 m a little easier while the difficulty still builds as you go.
+
+- [x] **Surges ease in.** The first comes at 400 to 460 m (was 260 to 310). Early surges stop 20 m below your best height (was 12 m), closing to 12 m by 1,500 m. The lava rises a third slower (1.7 s instead of 1.3 s), and early surges are further apart (about 270 m at first, was 250). Higher up they're as before.
+- [x] **Bats ease in.** They start at 200 m (was 150). Below 1,000 m there are fewer of them (about a third as many at the start, building to full), their patrols are shorter, and they fly up to 60% slower. Full strength from 1,000 m.
+- [x] **A shell before the first bats.** The first pickup once bats are about is always a shell, so your first misjudged bat isn't the end of the run.
+- [x] `SIM_VERSION` 5. Bot check, 12 seeds: the plain bot's middle run went from about 770 m to about 1,100 m; the careful bot in the Daily went from about 660 m to about 1,100 m, and still reaches the summit on 4 of 24 seeds, as before.
+- [ ] Owner playtest.
+
+### Suggestions from Claude (not agreed)
+
+Ideas that would make deaths feel fairer without making the game easier.
+
+- **Tide line.** During a rumble, draw a faint glowing line where the lava will stop, so you know how high you need to be. Display only, no rule change.
+- **Lava gauge.** A thin bar up the side of the screen showing how close the lava is, so you notice it before it's on screen.
+- **Bat tells.** Bats squeak and flash once the first time they come on screen, and early bats hang asleep until you're near. You'd still have to stomp them from above.
+- **"What got you" replay.** On the run-over screen, a 2-second replay of the moment you died. Laury tells you how to avoid it next time ("bats only fold when you land on them from above").
+- **Practice from a zone.** Once you've reached a zone, you can start a practice run there. It isn't ranked and has no board, so the board stays fair.
+- **Shell on the HUD.** A small shell icon while you're carrying one, and a "Shell saved you" pop when it breaks.
 
 ## Later ideas (not agreed)
 

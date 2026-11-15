@@ -308,7 +308,7 @@ describe('daily summit', () => {
 
   it('reaching it wins the run, and the server replay agrees', () => {
     let won = false;
-    for (const seed of [3, 11, 2, 4]) {
+    for (const seed of [17, 18, 19, 22]) {
       const { sim, log } = playBot(seed, 60 * 60 * 10, true, true, true);
       if (!sim.won) continue;
       won = true;

@@ -7,7 +7,7 @@ import { Rng, hash32, hashFrac } from './rng';
 import { CRUST_ZONE, DAILY_SPAN, FEATURE, difficulty, rockfallOn, windStrength, zoneIndexAt } from './zones';
 
 /** Bump this whenever a rule changes: stored input logs only replay under the version that made them. */
-export const SIM_VERSION = 4;
+export const SIM_VERSION = 5;
 
 export const WIDTH = 420;
 export const UNITS_PER_METER = 10;
@@ -32,6 +32,8 @@ export const START_LAVA = 120;
 export const PLAYER_HALF = 13;
 export const PLAYER_H = 30;
 export const BAT_R = 15;
+/** Bats reach full strength (rate, patrol width, speed) at this height, meters. */
+export const BAT_FULL = 1000;
 export const WISP_R = 13;
 export const PICKUP_R = 14;
 export const ROCK_HALF = 22;
@@ -50,13 +52,13 @@ export const INPUT_MAX = 4;
 
 // Eruption surges: past seeded heights the lava rumbles, then surges up close behind you and eases off.
 /** First surge height, meters: somewhere in [SURGE_FIRST, SURGE_FIRST + SURGE_FIRST_SPREAD). */
-export const SURGE_FIRST = 260;
-export const SURGE_FIRST_SPREAD = 50;
-/** Gap to the next surge, meters: about 250 low down, shrinking toward SURGE_GAP_MIN. */
+export const SURGE_FIRST = 400;
+export const SURGE_FIRST_SPREAD = 60;
+/** Gap to the next surge, meters: about 270 low down, shrinking toward SURGE_GAP_MIN. */
 export const SURGE_GAP_MIN = 120;
 /** Phase lengths, ticks. */
 export const SURGE_RUMBLE = 120;
-export const SURGE_RISE = 80;
+export const SURGE_RISE = 100;
 export const SURGE_HOLD = 60;
 export const SURGE_EASE = 300;
 /**
@@ -64,6 +66,9 @@ export const SURGE_EASE = 300;
  * (plus a margin), so there is always a route ledge in reach above the lava: 120 low down, about 157 at 3 km.
  */
 export const SURGE_LIMIT = 120;
+/** Early surges are gentler: the lava stops SURGE_EARLY short at the first surge, easing to SURGE_LIMIT by SURGE_FULL m. */
+export const SURGE_EARLY = 200;
+export const SURGE_FULL = 1500;
 
 export type SurgePhase = 'none' | 'rumble' | 'rise' | 'hold' | 'ease';
 
@@ -79,14 +84,15 @@ export function summitMeters(seed: number): number {
 
 /** Meters of the gap after a surge at `m` (before the seeded jitter). */
 export function surgeGap(m: number): number {
-  return SURGE_GAP_MIN + 150 * (1 - difficulty(m));
+  return SURGE_GAP_MIN + 200 * (1 - difficulty(m));
 }
 
 /** The closest the lava comes during a surge that starts at `m` meters. */
 export function surgeLimit(m: number): number {
   const d = difficulty(m);
   const widest = Math.min(MAX_GAP, 0.45 + 0.42 * d) * APEX;
-  return Math.max(SURGE_LIMIT, widest + 15);
+  const ramp = Math.max(0, Math.min(1, (m - SURGE_FIRST) / (SURGE_FULL - SURGE_FIRST)));
+  return Math.max(SURGE_EARLY - (SURGE_EARLY - SURGE_LIMIT) * ramp, widest + 15);
 }
 
 const BUCKET = 200;
@@ -280,6 +286,7 @@ export class Sim {
   private topX = WIDTH / 2;
   private topped = false;
   private nextPickupY: number;
+  private firstShell = false;
   private recent: Platform[] = [];
   private melted: Platform[] = [];
   private nextId = 1;
@@ -724,6 +731,11 @@ export class Sim {
       let pk = roll < 0.4 ? PickupKind.Shield : roll < 0.8 ? PickupKind.Geyser : PickupKind.Bubble;
       if (pk === PickupKind.Bubble && fm < FEATURE.bubble) pk = PickupKind.Geyser;
       if (pk === PickupKind.Shield && fm < FEATURE.bats) pk = PickupKind.Geyser;
+      // The first pickup once bats are about is always a shell, so the first bat you misjudge isn't the end.
+      if (fm >= FEATURE.bats && !this.firstShell) {
+        pk = PickupKind.Shield;
+        this.firstShell = true;
+      }
       const u: Pickup = { id: this.nextId++, kind: pk, x, y: y + PICKUP_R + 2, taken: false };
       this.pickups.push(u);
       this.bucket(this.uBuckets, u);
@@ -762,13 +774,15 @@ export class Sim {
     }
 
     // Bats patrol between ledges, kept clear of the route ledge itself.
-    if (fm >= FEATURE.bats && band > 60 && r.chance(0.04 + 0.22 * d)) {
+    // Below BAT_FULL meters they ease in: rarer, shorter patrols and slower wings.
+    const bw = Math.min(1, (fm - FEATURE.bats) / (BAT_FULL - FEATURE.bats));
+    if (fm >= FEATURE.bats && band > 60 && r.chance((0.04 + 0.22 * d) * (0.35 + 0.65 * bw))) {
       this.addHazard({
         kind: HazardKind.Bat,
         x: r.range(0, WIDTH),
         y: lowY + band * r.range(0.4, 0.6),
-        a: r.range(50, 90 + 110 * d),
-        per: r.int(160, 320),
+        a: r.range(35 + 15 * bw, 60 + 30 * bw + 110 * d),
+        per: Math.round(r.int(160, 320) * (1.6 - 0.6 * bw)),
         ph: r.int(0, 600),
       });
     }

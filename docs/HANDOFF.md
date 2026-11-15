@@ -2,7 +2,9 @@
 
 Last updated 2026-11-14. Live is **v0.6.0** (commit ff8a795), shipped 2026-11-14 at the owner's request before their playtest. Read ROADMAP.md for the plan and the decisions the owner has made, CLAUDE.md for the working rules, and docs/hosting.md for the server.
 
-## v0.7 (looks), on branch `v0.7-looks`, not shipped
+## v0.7 (looks), live since 2026-11-14 (e0f844c)
+
+The parbs.online card was updated for v0.7 the same day (PR #14 there), with a new gameplay loop.
 
 ROADMAP.md lists what it does. What a developer needs:
 

@@ -153,7 +153,7 @@ Asked for by the owner on 2026-11-14, to lean into the volcano theme.
 - [x] `SIM_VERSION` is 4. Runs stored under 3 keep their heights on the board but can no longer be watched (the board hides their watch button).
 - [ ] Owner playtest. Surges are the big difficulty change: the no-hazards bot still passes 1 km every run, but most of its runs now end in the Ice Cap (1.4 to 1.9 km), and the careful bot reached the Daily summit on 3 of 12 seeds. If it plays too hard, soften surges in the Ice Cap first.
 
-## v0.7 — looks (built 2026-11-14 on branch `v0.7-looks`, not shipped)
+## v0.7 — looks (live since 2026-11-14)
 
 Asked for by the owner on 2026-11-14. The owner picked "zone materials" and "settings panel" from Claude's options.
 

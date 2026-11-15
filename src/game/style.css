@@ -102,9 +102,6 @@ button {
   top: max(10px, env(safe-area-inset-top));
   width: 44px;
   height: 44px;
-  border-radius: 4px;
-  background: rgba(30, 10, 10, 0.6);
-  border: 1px solid var(--edge);
   font-size: 18px;
   pointer-events: auto;
 }
@@ -247,17 +244,10 @@ button {
 
 .skin-arrow {
   flex: none;
-  width: 36px;
+  width: 38px;
   height: 44px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid var(--edge);
   color: var(--hot);
   font-size: 16px;
-}
-
-.skin-arrow:hover {
-  background: rgba(255, 255, 255, 0.16);
 }
 
 .skin-name {
@@ -265,10 +255,6 @@ button {
   color: var(--hot);
   font-size: 18px;
   letter-spacing: 1px;
-}
-
-.pause-chips {
-  margin: 12px 0 0;
 }
 
 /* The logo is pixel art drawn by render.ts (Logo), blown up 4x with hard edges. */
@@ -324,57 +310,113 @@ h2 {
   -webkit-user-select: text;
 }
 
-.big-btn {
-  display: block;
-  width: 100%;
-  padding: 14px;
+/* ---------- Buttons: one family, three sizes ----------
+   Every button is a block of basalt with a 2px edge and a hard shadow underneath that it presses into.
+   .big-btn is the one main action on a panel (lava orange), .btn the rest, .chip the small ones. */
+.big-btn,
+.btn,
+.chip,
+.skin-arrow,
+.tab,
+.icon-btn {
+  --face: #3a1a16;
+  --rim: #74361f;
+  --base: #120505;
+  --lift: 3px;
+  background: var(--face);
+  border: 2px solid var(--rim);
   border-radius: 4px;
-  font-size: 28px;
-  font-weight: 700;
-  background: linear-gradient(180deg, var(--hot), var(--hot2));
-  color: #2a0d05;
-  box-shadow: 0 5px 0 #7a120a;
-  margin-bottom: 14px;
-  transition: transform 0.08s;
+  box-shadow: 0 var(--lift) 0 var(--base);
+  font-weight: 600;
+  transition: transform 0.06s, box-shadow 0.06s, background 0.1s, border-color 0.1s;
 }
 
-.big-btn:active {
-  transform: translateY(3px);
-  box-shadow: 0 2px 0 #7a120a;
+.big-btn:hover,
+.btn:hover,
+.chip:hover,
+.skin-arrow:hover,
+.tab:hover,
+.icon-btn:hover {
+  --face: #4c231c;
+  --rim: #b0542a;
+}
+
+.big-btn:active,
+.btn:active,
+.chip:active,
+.skin-arrow:active,
+.tab:active,
+.icon-btn:active {
+  transform: translateY(calc(var(--lift) - 1px));
+  box-shadow: 0 1px 0 var(--base);
+}
+
+.big-btn:focus-visible,
+.btn:focus-visible,
+.chip:focus-visible,
+.skin-arrow:focus-visible,
+.tab:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 2px;
+}
+
+.big-btn {
+  --lift: 5px;
+  --rim: #ffc85a;
+  --base: #7a120a;
+  display: block;
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 14px;
+  font-size: 28px;
+  font-weight: 700;
+  color: #2a0d05;
+  background: linear-gradient(180deg, var(--hot), var(--hot2));
+}
+
+.big-btn:hover {
+  --rim: #fff0a0;
+  background: linear-gradient(180deg, #ffc24a, #ff6a2a);
+}
+
+.panel > .big-btn:last-child {
+  margin-bottom: 4px;
 }
 
 .btn {
   flex: 1;
-  padding: 10px 12px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid var(--edge);
-  font-weight: 600;
-}
-
-.btn:hover,
-.chip:hover {
-  background: rgba(255, 255, 255, 0.18);
+  padding: 9px 10px;
+  font-size: 20px;
 }
 
 .row {
   display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
-.row.small {
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 6px;
+.row .btn {
+  white-space: nowrap;
+  padding-inline: 4px;
+}
+
+@media (max-width: 400px) {
+  .row .btn {
+    font-size: 18px;
+  }
 }
 
 .daily-btn {
   display: block;
   width: 100%;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   font-size: 22px;
   color: var(--mint);
+  --rim: #2f8a80;
+}
+
+.daily-btn:hover {
+  --rim: var(--mint);
 }
 
 .daily-btn small {
@@ -428,43 +470,77 @@ body.calm .big-btn {
 }
 
 .chip {
-  padding: 6px 14px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid var(--edge);
-  font-size: 18px;
+  --lift: 2px;
+  padding: 4px 12px;
+  font-size: 17px;
 }
 
-/* Settings switches: a pixel flame when on, a heap of ash with one dying ember when off.
-   The sprites are 3px "art pixels" drawn with box-shadow (cell 0,0 stays empty). */
-.chip.toggle {
+/* ---------- Settings ---------- */
+
+#settings {
+  z-index: 6;
+  background: rgba(12, 4, 4, 0.5);
+}
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+#settings .chip {
+  margin-bottom: 16px;
+}
+
+/* A switch row: name on the left, state on the right. A pixel flame when on, a heap of ash with one
+   dying ember when off. The sprites are 3px "art pixels" drawn with box-shadow (cell 0,0 stays empty). */
+.btn.toggle {
   position: relative;
-  padding-left: 36px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 9px 14px 9px 42px;
+  text-align: left;
 }
 
-.chip.toggle::before {
+.toggle .state {
+  font-size: 17px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.toggle::before {
   content: '';
   position: absolute;
-  left: 12px;
+  left: 13px;
   top: 50%;
   margin-top: -10px;
   width: 3px;
   height: 3px;
 }
 
-.chip.toggle.on {
+.btn.toggle.on {
+  --face: #5a1e10;
+  --rim: #ff9a2e;
+  --base: #6a1208;
   color: #fff3d6;
-  border-color: #ff9a2e;
-  background: linear-gradient(180deg, rgba(255, 140, 40, 0.28), rgba(200, 40, 20, 0.38));
-  box-shadow: 0 0 10px rgba(255, 110, 30, 0.45), inset 0 -2px 0 rgba(255, 200, 80, 0.25);
-  text-shadow: 0 0 6px rgba(255, 150, 40, 0.8);
+  background: linear-gradient(180deg, #7a3010, #4a1608);
+  box-shadow: 0 var(--lift) 0 var(--base), 0 0 12px rgba(255, 110, 30, 0.35);
+  text-shadow: 0 0 6px rgba(255, 150, 40, 0.7);
 }
 
-.chip.toggle.on:hover {
-  background: linear-gradient(180deg, rgba(255, 150, 50, 0.38), rgba(210, 50, 20, 0.48));
+.btn.toggle.on:hover {
+  --rim: #ffc85a;
+  background: linear-gradient(180deg, #8a3a14, #561a0a);
 }
 
-.chip.toggle.on::before {
+.toggle.on .state {
+  color: var(--hot);
+}
+
+.toggle.on::before {
   box-shadow:
     6px 0 #e8401c, 3px 3px #e8401c, 6px 3px #ffa024,
     3px 6px #e8401c, 6px 6px #ffa024, 9px 6px #e8401c,
@@ -485,24 +561,30 @@ body.calm .big-btn {
   }
 }
 
-.chip.toggle.off {
-  color: #9c938d;
-  border-color: rgba(140, 130, 124, 0.4);
-  background: rgba(50, 46, 44, 0.55);
+.btn.toggle.off {
+  --face: #2c2826;
+  --rim: #5a524d;
+  --base: #0e0c0b;
+  color: #a59a92;
 }
 
-.chip.toggle.off:hover {
-  background: rgba(70, 64, 60, 0.65);
+.btn.toggle.off:hover {
+  --face: #383230;
+  --rim: #7a706a;
 }
 
-.chip.toggle.off::before {
+.toggle.off .state {
+  color: #7a706a;
+}
+
+.toggle.off::before {
   box-shadow:
     6px 9px #8d8580,
     3px 12px #8d8580, 6px 12px #57504c, 9px 12px #a8441c, 12px 12px #8d8580,
     0 15px #57504c, 3px 15px #8d8580, 6px 15px #57504c, 9px 15px #8d8580, 12px 15px #57504c;
 }
 
-body.calm .chip.toggle.on::before {
+body.calm .toggle.on::before {
   animation: none;
 }
 
@@ -565,14 +647,13 @@ body.calm .chip.toggle.on::before {
 
 .tab {
   flex: 1;
-  padding: 8px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.06);
-  font-weight: 600;
+  padding: 6px;
 }
 
 .tab.active {
-  background: var(--mint);
+  --face: var(--mint);
+  --rim: #b8fff6;
+  --base: #1f6b63;
   color: #0c2a2a;
 }
 
@@ -708,11 +789,21 @@ body.calm .chip.toggle.on::before {
     padding: 3px 12px;
     font-size: 16px;
   }
-  .chip.toggle {
-    padding-left: 32px;
+  .btn.toggle {
+    padding-top: 2px;
+    padding-bottom: 2px;
+    font-size: 18px;
   }
-  .chip.toggle::before {
-    left: 10px;
+  .settings-list {
+    gap: 5px;
+    margin-bottom: 10px;
+  }
+  #settings h2 {
+    margin-bottom: 8px;
+    font-size: 24px;
+  }
+  #settings .chip {
+    margin-bottom: 10px;
   }
   .big-btn {
     padding: 6px;

@@ -2,6 +2,16 @@
 
 Last updated 2026-11-14. Live is **v0.6.0** (commit ff8a795), shipped 2026-11-14 at the owner's request before their playtest. Read ROADMAP.md for the plan and the decisions the owner has made, CLAUDE.md for the working rules, and docs/hosting.md for the server.
 
+## v0.7 (looks), on branch `v0.7-looks`, not shipped
+
+ROADMAP.md lists what it does. What a developer needs:
+
+- **Ledges:** `platform()` in `render.ts` hands cracked ledges to `crumbleLedge(z, …)` and drifting Normal ledges above the chamber to `driftLedge(z, …)`. `lift(z, …)` draws what holds any drifting ledge up, and `pieces()` splits a cracked ledge at its gaps. The zone comes from `sim.zoneAt`, so the Daily's squeezed zones work.
+- **UI:** the button family is the block at the top of the Buttons section in `style.css` (`--face`, `--rim`, `--base`, `--lift`). The settings rows are `.btn.toggle`, filled in by `setToggle(button, on, state?)` in `main.ts`, which keeps the button's original text as its name. The `#settings` panel sits above the pause menu (z-index 6), and `input.onPause` closes it before anything else.
+- **Checked:** 34 tests, typecheck, build, `livecheck` (10), `laurycheck` (13, four runs in a row) and screenshots of every zone's ledges, and the title, settings, pause, game-over and board screens at desktop, 360x640 and 640x360.
+  - `laurycheck`'s `endRun` now waits out a death if the unsteered climber has already fallen. It was flaky before because of that.
+- **Not checked:** nobody has played it, and it hasn't been seen on a real phone.
+
 ## v0.6 (eruption), live, not yet played by the owner
 
 ROADMAP.md lists what each feature does. What a developer needs:

@@ -128,7 +128,7 @@ Asked for by the owner on 2026-11-14: see the other players live when you're pla
 - [x] Daily Climb: everyone is on the same volcano, so others hop beside you, see-through, in their own look, with a name tag.
 - [x] Endless: everyone has their own volcano, so drawing them on your ledges would look wrong. Instead each one is a notch on the left wall at their height, with their name.
 - [x] Anyone above or below the view gets an arrow with their name and height at the top or bottom edge. The HUD says how many are climbing with you, and the title screen how many are climbing now.
-- [x] **Others on/off** on the title screen and in the pause menu. Off hides them and hides you from them.
+- [x] **Show others climbing** in Settings (from the title screen or the pause menu). Off hides them and hides you from them.
 - [x] No sim change: `SIM_VERSION` stays 3. `tests/live.test.ts` and `scripts/livecheck.mjs` (two headless climbers) check it.
 - [ ] Owner playtest with a second player.
 
@@ -138,7 +138,7 @@ Laury, the tutorial guide (asked for by the owner on 2026-11-14):
 - [x] The first time you try a mode she gives a short tutorial while the run waits: the basics (8 lines, steering explained for keys or touch), then the Daily Climb's own 4 to 5 lines. Next with a tap, Enter, Space or a gamepad button; Skip or Esc ends it.
 - [x] Later runs: a quick joke at the start, then she leaves. About a third of the time it's about how your last run ended (lava, bat, wisp, rockfall, quitting). She avoids repeating her last 12 lines.
 - [x] She checks in at 500 m and 1,000 m, then at each further 500 m mark about half the time.
-- [x] Never blocks steering during play (the bubble ignores touches). **Laury on/off** on the title screen and in the pause menu; How to play has a button to see her tutorial again.
+- [x] Never blocks steering during play (the bubble ignores touches). **Laury on/off** in Settings, which also has a button to see her tutorial again.
 - [x] Her lines are data in `src/game/laury-lines.ts`. `scripts/laurycheck.mjs` checks the whole flow headless.
 
 ## v0.6 — eruption (live since 2026-11-14)
@@ -152,6 +152,14 @@ Asked for by the owner on 2026-11-14, to lean into the volcano theme.
 - [x] **Laury and naming.** Laury has lines for a rumble, a surge survived, a near miss and the summit. The game-over screen names the cause: "Scorched at 840 m" (`src/game/cause-text.ts`).
 - [x] `SIM_VERSION` is 4. Runs stored under 3 keep their heights on the board but can no longer be watched (the board hides their watch button).
 - [ ] Owner playtest. Surges are the big difficulty change: the no-hazards bot still passes 1 km every run, but most of its runs now end in the Ice Cap (1.4 to 1.9 km), and the careful bot reached the Daily summit on 3 of 12 seeds. If it plays too hard, soften surges in the Ice Cap first.
+
+## v0.7 — looks (built 2026-11-14 on branch `v0.7-looks`, not shipped)
+
+Asked for by the owner on 2026-11-14. The owner picked "zone materials" and "settings panel" from Claude's options.
+
+- [x] **Zone ledges.** Cracked and drifting ledges are made of their zone's material. Cracked: cooled lava blocks with glowing seams, crystal shards, brittle ribs, a thin snow crust, cinder blocks, packed ash flaking away. Drifting: the chamber's rock on sparks, a floating crystal over a glow, a bone raft shedding dust, an ice floe on steam, a smoking pumice raft, a cinder puff. The tells stay the same in every zone: cracked ledges show gaps between their pieces, drifting ones have something under them. Fakes are unchanged. Cosmetic only, no sim change.
+- [x] **Home screen and buttons.** One button family: every button is a basalt block with a 2px edge and a hard shadow it presses into. Three sizes: the lava-orange main action on each panel, normal buttons, and small chips. The board tabs and pause button use it too.
+- [x] **Settings panel.** The title shows Climb, Daily Climb and Board / How to play / Settings. Settings is one panel, opened from the title or the pause menu: Sound, Music, Calm effects, Tilt to steer (phones), Show others climbing and Laury, each a row lit in fire when on and burnt ash when off, plus Laury's tutorial button. Escape closes it first. The home screen now fits at 360x640 and 640x360.
 
 ## Later ideas (not agreed)
 

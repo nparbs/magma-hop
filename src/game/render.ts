@@ -1033,7 +1033,18 @@ export class Renderer {
     const { b } = this;
     const w = Math.round(p.w / A);
     const left = cx - Math.floor(w / 2);
-    let [glow, lit, dark] = ZONES[this.sim ? this.sim.zoneAt(p.y / UNITS_PER_METER) : 0].plat;
+    const z = this.sim ? this.sim.zoneAt(p.y / UNITS_PER_METER) : 0;
+    let [glow, lit, dark] = ZONES[z].plat;
+    const moving = p.mx !== 0 || p.my !== 0;
+    // Cracked and drifting ledges are made of what their zone is made of. The tells stay the same
+    // everywhere: cracked ledges show gaps between their pieces, drifting ones are held up from below.
+    if (p.kind === Kind.Crumble || (p.kind === Kind.Normal && moving && z > 0)) {
+      if (p.kind === Kind.Crumble) this.crumbleLedge(z, left, top, w, p.id);
+      else this.driftLedge(z, left, top, w, p.id);
+      if (moving) this.lift(z, left, top, w, p.id);
+      this.puffcap(p, cx, top);
+      return;
+    }
     if (p.kind === Kind.Crust) {
       if (p.melt >= 0) {
         // Melted: only a faint outline of where it was.
@@ -1044,7 +1055,6 @@ export class Renderer {
       }
       [glow, lit, dark] = ['#4a3636', '#2e2023', '#1a1115'];
     }
-    if (p.kind === Kind.Crumble) [glow, lit, dark] = ['#c9a27a', '#8a6248', '#4f3628'];
     if (p.kind === Kind.Ice) [glow, lit, dark] = ['#ffffff', '#bfeaff', '#6fb6d9'];
 
     if (p.kind === Kind.Fake) b.globalAlpha = 0.82 + 0.1 * Math.sin(this.time * 7 + p.id);
@@ -1065,9 +1075,6 @@ export class Renderer {
         this.r(left + c, top, 2, 1, dark);
         this.r(left + c, top + 1, 1, 2, '#0c0506');
       }
-    } else if (p.kind === Kind.Crumble) {
-      // Loose blocks with gaps between them: one bounce and it's gone.
-      for (let c = 4 + Math.floor(hashFrac(p.id, 98) * 3); c < w - 3; c += 6) this.r(left + c, top, 1, 5, '#1a0d0a');
     } else if (p.kind === Kind.Crust) {
       // Glowing cracks: more of them, and hotter, as it heats.
       const HEAT = ['#7a2a14', '#c4481a', '#ff7a1e', '#ffd84a'];
@@ -1088,16 +1095,169 @@ export class Renderer {
     } else if (p.kind === Kind.Ice) {
       for (let c = 1; c < w - 1; c += 4) this.r(left + c, top + 4, 1, 1 + Math.floor(hashFrac(p.id, c + 40) * 4), '#dff6ff');
     }
-    if (p.mx !== 0 || p.my !== 0) {
-      // Hot sparks hold drifting ledges up.
-      const fl = Math.floor(this.time * 12 + p.id) % 3;
-      for (const ex of [left + 2, left + w - 4]) {
+    if (moving) this.lift(z, left, top, w, p.id);
+    this.puffcap(p, cx, top);
+  }
+
+  /** The pieces of a cracked ledge, split by 1-pixel gaps: [start, width] in art pixels. */
+  private pieces(w: number, id: number): [number, number][] {
+    const out: [number, number][] = [];
+    let a = 0;
+    for (let g = 4 + Math.floor(hashFrac(id, 98) * 3); g < w - 3; g += 6) {
+      out.push([a, g - a]);
+      a = g + 1;
+    }
+    out.push([a, w - a]);
+    return out;
+  }
+
+  /** A cracked ledge (one bounce and it's gone), in its zone's material. */
+  private crumbleLedge(z: number, left: number, top: number, w: number, id: number): void {
+    const { b } = this;
+    const parts = this.pieces(w, id);
+    if (z === 0) {
+      // Cooled lava blocks, still glowing in the seams.
+      b.globalAlpha = 0.55;
+      for (const [a] of parts) if (a > 0) this.r(left + a - 1, top + 1, 1, 3, '#ff6a1e');
+      b.globalAlpha = 1;
+    }
+    for (const [a, pw] of parts) {
+      const x = left + a;
+      const f = hashFrac(id, a + 7);
+      if (z === 0) {
+        this.r(x, top, pw, 1, '#a0482a');
+        this.r(x, top + 1, pw, 2, '#5a2618');
+        this.r(x, top + 3, pw, 1 + Math.floor(f * 2), '#2e1210');
+        if (pw > 2) this.r(x + 1, top + 1, 1, 1, '#c4602e');
+      } else if (z === 1) {
+        // Cracked crystal shards, each with a point underneath.
+        this.r(x, top, pw, 1, '#e6e0ff');
+        this.r(x, top + 1, pw, 2, '#8a76e0');
+        this.r(x, top + 3, pw, 1, '#4a3a9a');
+        if (pw > 2) this.r(x + 1, top + 4, pw - 2, 1, '#4a3a9a');
+        this.r(x + Math.floor(pw / 2), top + 5, 1, 1, '#2e2470');
+        this.r(x + Math.floor(f * (pw - 1)), top + 1, 1, 1, '#ffffff');
+      } else if (z === 2) {
+        // Brittle ribs on a thin spine.
+        this.r(x, top, pw, 1, '#fff4d6');
+        this.r(x, top + 1, pw, 1, '#c9b48a');
+        for (let c = 1; c < pw; c += 2) this.r(x + c, top + 2, 1, 2 + Math.floor(hashFrac(id, a + c) * 2), '#d9c79c');
+      } else if (z === 3) {
+        // A thin snow crust with clumps hanging off it.
+        this.r(x, top, pw, 1, '#ffffff');
+        this.r(x, top + 1, pw, 1, '#dff2fb');
+        this.r(x, top + 2, pw, 1, '#a8d4ea');
+        if (pw > 3) this.r(x + 1 + Math.floor(f * (pw - 3)), top + 3, 2, 1 + Math.floor(f * 2), '#cfeefc');
+      } else if (z === 4) {
+        // Porous cinder blocks.
+        this.r(x, top, pw, 1, '#c09a8e');
+        this.r(x, top + 1, pw, 2, '#4a3c40');
+        this.r(x, top + 3, pw, 1, '#2a2024');
+        if (pw > 2) this.r(x + 1 + Math.floor(f * (pw - 2)), top + 1, 1, 1, '#1a1216');
+        if (f > 0.7) this.r(x + Math.floor(f * pw) - 1, top + 2, 1, 1, '#ff7a3c');
+      } else {
+        // Packed ash, flaking away underneath.
+        this.r(x, top, pw, 1, '#c9c0cf');
+        this.r(x, top + 1, pw, 2, '#75697f');
+        this.r(x, top + 3, pw, 1, '#4a4252');
+        const fall = (this.time * 5 + f * 8) % 8;
+        b.globalAlpha = 1 - fall / 8;
+        this.r(x + Math.floor(f * pw), top + 4 + Math.floor(fall), 1, 1, '#a89fb0');
+        b.globalAlpha = 1;
+      }
+    }
+  }
+
+  /** A drifting ledge's body above the Magma Chamber (the chamber keeps plain rock). */
+  private driftLedge(z: number, left: number, top: number, w: number, id: number): void {
+    if (z === 1) {
+      // A floating crystal, tapering to a point.
+      this.r(left + 1, top, w - 2, 1, '#b8fff6');
+      this.r(left, top + 1, w, 1, '#8a76e0');
+      this.r(left, top + 2, w, 1, '#5a48b0');
+      let inset = 1;
+      for (let y = top + 3; inset * 2 < w && y < top + 7; y++, inset += 2) this.r(left + inset, y, w - inset * 2, 1, '#3d2f86');
+      for (let c = 3; c < w - 3; c += 6) this.r(left + c, top + 1, 1, 2, '#cfc4ff');
+    } else if (z === 2) {
+      // A raft of bone with knobbed ends.
+      this.r(left + 1, top, w - 2, 1, '#fff4d6');
+      this.r(left, top + 1, w, 1, '#efe2c0');
+      this.r(left, top + 2, w, 1, '#c9b48a');
+      this.r(left + 1, top + 3, w - 2, 1, '#8a7652');
+      for (const ex of [left - 1, left + w - 2]) {
+        this.r(ex, top - 1, 3, 5, '#efe2c0');
+        this.r(ex + 1, top - 1, 1, 1, '#fff4d6');
+      }
+      for (let c = 4 + Math.floor(hashFrac(id, 3) * 3); c < w - 4; c += 6) this.r(left + c, top + 1, 1, 2, '#8a7652');
+    } else if (z === 3) {
+      // An ice floe.
+      this.r(left, top, w, 1, '#ffffff');
+      this.r(left, top + 1, w, 1, '#cfeefc');
+      this.r(left, top + 2, w, 1, '#8cc4e2');
+      this.r(left + 1, top + 3, w - 2, 1, '#5b98bd');
+      for (let c = 2; c < w - 2; c += 5) if (hashFrac(id, c) > 0.5) this.r(left + c, top + 4, 2, 1, '#5b98bd');
+      if (Math.sin(this.time * 3 + id) > 0.8) this.r(left + 2, top + 1, 1, 1, '#ffffff');
+    } else if (z === 4) {
+      // A raft of pumice, full of holes.
+      this.r(left + 1, top, w - 2, 1, '#ff8a4a');
+      this.r(left, top + 1, w, 1, '#9a7a72');
+      this.r(left, top + 2, w, 2, '#6e5550');
+      this.r(left + 1, top + 4, w - 2, 1, '#4a3836');
+      for (let c = 1; c < w - 1; c += 3) {
+        const f = hashFrac(id, c + 20);
+        if (f > 0.45) this.r(left + c, top + 2 + Math.floor(f * 2), 1, 1, '#2e2224');
+      }
+    } else {
+      // A puff of cinder cloud, darker than the sky's clouds, with a glowing top so it reads as solid.
+      for (let c = 1; c < w - 3; c += 4) this.r(left + c, top - 1, 3, 1, '#8a7f94');
+      this.r(left, top, w, 1, '#ffd9f2');
+      this.r(left, top + 1, w, 2, '#4a4252');
+      this.r(left + 1, top + 3, w - 2, 1, '#2e2834');
+      for (let c = 2; c < w - 3; c += 4) if (hashFrac(id, c) > 0.5) this.r(left + c, top + 4, 2, 1, '#2e2834');
+    }
+  }
+
+  /** What holds a drifting ledge up, by zone. */
+  private lift(z: number, left: number, top: number, w: number, id: number): void {
+    const { b } = this;
+    const fl = Math.floor(this.time * 12 + id) % 3;
+    const ends = [left + 2, left + w - 4];
+    if (z === 0) {
+      // Hot sparks.
+      for (const ex of ends) {
         this.r(ex, top + 6 + fl, 2, 1, '#ffb02e');
         this.r(ex + (fl === 1 ? 1 : 0), top + 8 + fl, 1, 1, '#ff5a1e');
       }
+    } else if (z === 1) {
+      // A soft crystal glow.
+      b.globalAlpha = 0.22 + 0.1 * Math.sin(this.time * 4 + id);
+      this.r(left + 3, top + 7, w - 6, 1, '#6ff2e0');
+      this.r(left + 5, top + 8, w - 10, 1, '#6ff2e0');
+      b.globalAlpha = 1;
+      this.r(left + Math.floor(w / 2), top + 8 + fl * 2, 1, 1, '#b8fff6');
+    } else if (z === 2 || z === 5) {
+      // Dust or ash trickling off.
+      const col = z === 2 ? '#d9c08a' : '#a89fb0';
+      for (const ex of ends) {
+        b.globalAlpha = 0.8 - fl * 0.25;
+        this.r(ex + (fl === 1 ? 1 : 0), top + 6 + fl * 2, 1, 1, col);
+        b.globalAlpha = 1;
+      }
+    } else {
+      // Steam (Ice Cap) or smoke with a spark (Crater Rim).
+      const col = z === 3 ? '#e8fbff' : '#8a7a80';
+      for (const ex of ends) {
+        b.globalAlpha = 0.55 - fl * 0.15;
+        this.r(ex, top + 6 + fl * 2, 2 + fl, 2, col);
+        b.globalAlpha = 1;
+      }
+      if (z === 4) this.r(ends[fl % 2] + 1, top + 7 + fl, 1, 1, '#ffb02e');
     }
+  }
+
+  /** A puffcap mushroom: land on it for a big bounce. */
+  private puffcap(p: Platform, cx: number, top: number): void {
     if (p.spring !== null) {
-      // A puffcap mushroom: land on it for a big bounce.
       const pop = Math.round((this.springAnim.get(p.id) ?? 0) * 4);
       const sx = cx + Math.round(p.spring / A);
       this.r(sx - 1, top - 3 - pop, 2, 3 + pop, '#f3e3c8');

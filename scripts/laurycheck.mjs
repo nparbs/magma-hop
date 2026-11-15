@@ -40,10 +40,14 @@ async function clickThrough(page) {
   return lines.size;
 }
 
+/** End the run from the pause menu, or wait out the death if the unsteered climber already fell. */
 async function endRun(page) {
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(200);
-  await page.click('#endBtn');
+  if ((await mode(page)) === 'play') {
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    await page.click('#endBtn');
+  }
+  await page.waitForFunction(() => window.magmahop.mode === 'over', null, { timeout: 5000 });
   await page.waitForTimeout(300);
 }
 
@@ -102,8 +106,10 @@ async function endRun(page) {
   await endRun(page);
   await page.click('#menuBtn');
 
-  // Laury off.
+  // Laury off, from Settings.
+  await page.click('#settingsBtn');
   await page.click('#lauryBtn');
+  await page.click('#settings .close');
   await page.click('#playBtn');
   await page.waitForTimeout(1600);
   check(!(await state(page)).show, 'Laury off: she stays home');

@@ -59,12 +59,13 @@ for (const kind of ['daily', 'endless']) {
 // Others off: you neither see nor are seen.
 const a = await climber('Ann', { width: 1280, height: 720 });
 const b = await climber('Bo', { width: 1280, height: 720 });
+await b.click('#settingsBtn');
 await b.click('#liveBtn');
+await b.click('#settings .close');
 await a.click('#dailyBtn');
 await b.click('#dailyBtn');
 await a.waitForTimeout(2000);
 check((await rivals(a)).length === 0 && (await rivals(b)).length === 0, 'Others off hides both ways');
-await b.click('#liveBtn').catch(() => {});
 
 check(!errors.length, `no page errors ${errors.join(' | ')}`);
 await browser.close();

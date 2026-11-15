@@ -111,10 +111,9 @@ const ui = {
   music: $('musicBtn'),
   calm: $('calmBtn'),
   tilt: $('tiltBtn'),
-  pauseTilt: $('pauseTilt'),
   skinName: $('skinName'),
   live: $('liveBtn'),
-  pauseLive: $('pauseLive'),
+  settings: $('settings'),
   liveNote: $('liveNote'),
 };
 $('ver').textContent = `v${__APP_VERSION__}`;
@@ -173,16 +172,23 @@ renderer.snapCamera(sim.lavaY);
 ui.name.value = store.get('name') ?? '';
 ui.name.addEventListener('change', () => store.set('name', ui.name.value.trim()));
 
-/** A settings switch: lit in fire when on, burnt-out ash when off. */
-function setToggle(b: HTMLElement, on: boolean, label: string): void {
-  b.textContent = label;
-  b.classList.add('toggle');
+/** A row in Settings: lit in fire when on, burnt-out ash when off. The name stays put; `state` overrides On/Off. */
+function setToggle(b: HTMLElement, on: boolean, state = on ? 'On' : 'Off'): void {
+  b.dataset.name ??= b.textContent ?? '';
+  b.innerHTML = '';
+  const name = document.createElement('span');
+  name.textContent = b.dataset.name;
+  const st = document.createElement('span');
+  st.className = 'state';
+  st.textContent = state;
+  b.append(name, st);
   b.classList.toggle('on', on);
   b.classList.toggle('off', !on);
+  b.setAttribute('aria-label', `${b.dataset.name}: ${state}`);
 }
 
 sfx.setMuted(store.get('muted') === '1');
-const soundLabel = () => setToggle(ui.sound, !sfx.muted, sfx.muted ? 'Sound off' : 'Sound on');
+const soundLabel = () => setToggle(ui.sound, !sfx.muted);
 soundLabel();
 ui.sound.addEventListener('click', () => {
   sfx.setMuted(!sfx.muted);
@@ -196,7 +202,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 sfx.setMusic(store.get('music') !== '0');
-const musicLabel = () => setToggle(ui.music, sfx.musicOn, sfx.musicOn ? 'Music on' : 'Music off');
+const musicLabel = () => setToggle(ui.music, sfx.musicOn);
 musicLabel();
 ui.music.addEventListener('click', () => {
   sfx.unlock();
@@ -211,7 +217,7 @@ let calm = calmSaved === null ? matchMedia('(prefers-reduced-motion: reduce)').m
 const applyCalm = () => {
   renderer.calm = calm;
   document.body.classList.toggle('calm', calm);
-  setToggle(ui.calm, calm, calm ? 'Calm effects on' : 'Calm effects off');
+  setToggle(ui.calm, calm);
 };
 applyCalm();
 ui.calm.addEventListener('click', () => {
@@ -240,24 +246,20 @@ for (const [id, d] of [['skinPrev', -1], ['skinNext', 1]] as const) {
   });
 }
 
-// Tilt to steer, on phones and tablets. The switch is on the title screen and in the pause menu.
+// Tilt to steer, on phones and tablets. The switch is in Settings (from the title or the pause menu).
 // iPhones only allow it after asking, from a tap.
 if ('ontouchstart' in window && 'DeviceOrientationEvent' in window) {
-  const label = () => {
-    for (const b of [ui.tilt, ui.pauseTilt]) setToggle(b, input.tiltOn, input.tiltOn ? 'Tilt on' : 'Tilt off');
-  };
-  for (const b of [ui.tilt, ui.pauseTilt]) {
-    b.classList.remove('hidden');
-    b.addEventListener('click', async () => {
-      if (input.tiltOn) input.tiltOn = false;
-      else if (!(await input.enableTilt())) {
-        setToggle(b, false, 'Tilt not allowed');
-        return;
-      }
-      store.set('tilt', input.tiltOn ? '1' : '0');
-      label();
-    });
-  }
+  const label = () => setToggle(ui.tilt, input.tiltOn);
+  ui.tilt.classList.remove('hidden');
+  ui.tilt.addEventListener('click', async () => {
+    if (input.tiltOn) input.tiltOn = false;
+    else if (!(await input.enableTilt())) {
+      setToggle(ui.tilt, false, 'Not allowed');
+      return;
+    }
+    store.set('tilt', input.tiltOn ? '1' : '0');
+    label();
+  });
   // Android turns it straight back on; iPhones need the tap again, so the label stays honest.
   if (store.get('tilt') === '1') void input.enableTilt().then(label);
   label();
@@ -266,21 +268,17 @@ if ('ontouchstart' in window && 'DeviceOrientationEvent' in window) {
 // Seeing other players climbing the same mode right now. Off hides them and hides you from them.
 const live = new LiveClimbers();
 let liveOn = store.get('live') !== '0';
-const liveLabel = () => {
-  for (const b of [ui.live, ui.pauseLive]) setToggle(b, liveOn, liveOn ? 'Others on' : 'Others off');
-};
+const liveLabel = () => setToggle(ui.live, liveOn);
 liveLabel();
-for (const b of [ui.live, ui.pauseLive]) {
-  b.addEventListener('click', () => {
-    liveOn = !liveOn;
-    store.set('live', liveOn ? '1' : '0');
-    liveLabel();
-    sfx.click();
-    if (!liveOn) live.leave();
-    else if (run && (mode === 'play' || mode === 'pause')) live.begin(run.runId);
-    void refreshLiveNote();
-  });
-}
+ui.live.addEventListener('click', () => {
+  liveOn = !liveOn;
+  store.set('live', liveOn ? '1' : '0');
+  liveLabel();
+  sfx.click();
+  if (!liveOn) live.leave();
+  else if (run && (mode === 'play' || mode === 'pause')) live.begin(run.runId);
+  void refreshLiveNote();
+});
 
 /** On the title screen: how many are climbing right now. */
 async function refreshLiveNote(): Promise<void> {
@@ -305,19 +303,15 @@ const laury = new Laury(
   $<HTMLButtonElement>('laurySkip'),
 );
 let lauryOn = store.get('laury') !== '0';
-const lauryLabel = () => {
-  for (const id of ['lauryBtn', 'pauseLaury']) setToggle($(id), lauryOn, lauryOn ? 'Laury on' : 'Laury off');
-};
+const lauryLabel = () => setToggle($('lauryBtn'), lauryOn);
 lauryLabel();
-for (const id of ['lauryBtn', 'pauseLaury']) {
-  $(id).addEventListener('click', () => {
-    lauryOn = !lauryOn;
-    store.set('laury', lauryOn ? '1' : '0');
-    lauryLabel();
-    sfx.click();
-    if (!lauryOn) laury.finish();
-  });
-}
+$('lauryBtn').addEventListener('click', () => {
+  lauryOn = !lauryOn;
+  store.set('laury', lauryOn ? '1' : '0');
+  lauryLabel();
+  sfx.click();
+  if (!lauryOn) laury.finish();
+});
 $('lauryAgain').addEventListener('click', (e) => {
   store.set('seen.basics', '0');
   store.set('seen.daily', '0');
@@ -640,7 +634,7 @@ function resume(): void {
   input.reset();
   show('play');
 }
-input.onPause = () => (mode === 'intro' ? laury.finish() : mode === 'play' ? pause() : mode === 'pause' ? resume() : mode === 'watch' ? stopWatching() : undefined);
+input.onPause = () => (!ui.settings.classList.contains('hidden') ? ui.settings.classList.add('hidden') : mode === 'intro' ? laury.finish() : mode === 'play' ? pause() : mode === 'pause' ? resume() : mode === 'watch' ? stopWatching() : undefined);
 ui.pauseBtn.addEventListener('click', pause);
 // During the tutorial a tap anywhere moves her along.
 canvas.addEventListener('pointerdown', () => {
@@ -706,6 +700,9 @@ $('menuBtn').addEventListener('click', toTitle);
 $('boardBtn').addEventListener('click', () => void showBoard());
 $('oBoardBtn').addEventListener('click', () => void showBoard(lastKind === 'daily' ? 'daily' : boardRange === 'daily' ? 'all' : boardRange));
 $('howBtn').addEventListener('click', () => ui.how.classList.remove('hidden'));
+for (const id of ['settingsBtn', 'pauseSettings']) $(id).addEventListener('click', () => ui.settings.classList.remove('hidden'));
+/** A panel open over the title, pause or run-over screen. */
+const overlayOpen = () => [ui.board, ui.how, ui.settings].some((p) => !p.classList.contains('hidden'));
 window.addEventListener('keydown', (e) => {
   if ((e.target as HTMLElement)?.tagName === 'INPUT') {
     if (e.code === 'Enter') void startGame('endless');
@@ -717,7 +714,7 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if ((e.code === 'Enter' || e.code === 'Space') && (mode === 'title' || mode === 'over')) {
-    if (!ui.board.classList.contains('hidden') || !ui.how.classList.contains('hidden')) return;
+    if (overlayOpen()) return;
     e.preventDefault();
     void startGame(mode === 'title' ? 'endless' : lastKind);
   }

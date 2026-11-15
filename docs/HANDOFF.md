@@ -1,6 +1,21 @@
 # Handoff
 
-Last updated 2026-11-14. Live is **v0.6.0** (commit ff8a795), shipped 2026-11-14 at the owner's request before their playtest. Read ROADMAP.md for the plan and the decisions the owner has made, CLAUDE.md for the working rules, and docs/hosting.md for the server.
+Last updated 2026-11-15. Live is **v0.7.2** (commit d397730). Read ROADMAP.md for the plan and the decisions the owner has made, CLAUDE.md for the working rules, and docs/hosting.md for the server.
+
+## v0.7.1 (gentler start) and v0.7.2 (tide line), live since 2026-11-15
+
+The owner's first playtest note on v0.6: surges and the early bats were too punishing. They asked for an easier climb to 1,000 m that still gets harder as you go. They said the v0.7.1 surge numbers below are about right, then picked the tide line from Claude's suggestions.
+
+- **v0.7.1 (f9f544b), `SIM_VERSION` 5.** All in `src/sim/sim.ts`, plus `FEATURE.bats` in `zones.ts`.
+  - Surges: `SURGE_FIRST` is 400 (+0 to 60), `SURGE_RISE` is 100 ticks, and `surgeGap` is `120 + 200 * (1 - d)`. `surgeLimit(m)` ramps from `SURGE_EARLY` (200 units = 20 m) at the first surge to `SURGE_LIMIT` (120) by `SURGE_FULL` (1,500 m), and never goes below the widest route gap + 15.
+  - Bats: they start at 200 m (`FEATURE.bats`). In `genStep`, `bw` ramps 0 to 1 from 200 m to `BAT_FULL` (1,000 m) and scales the spawn chance (×0.35 up to ×1), the patrol width, and the period (×1.6 down to ×1, so slower wings).
+  - First shell: the first pickup at or above `FEATURE.bats` is forced to a shell (the `firstShell` flag).
+  - The Daily-win test now uses seeds 17, 18, 19 and 22, since the old ones no longer reach the summit.
+  - Bot stats, 12 seeds: the plain bot's middle run went from about 770 m to about 1,100 m. The careful Daily bot went from about 660 m to about 1,100 m and still reaches the summit on 4 of 24 seeds.
+- **v0.7.2 (d397730).** `drawTideLine(sim)` in `render.ts` runs right after `drawLava`. From `rumble` through `rise`, it draws a dashed two-tone line at `sim.maxY - sim.surgeMin`, and hides it once the lava is within 3 px of it. It fades in over 30 ticks, and the dashes march and pulse unless calm effects are on. Display only.
+- **Checked:** 34 tests, typecheck, bot stats, and headless screenshots of the tide line during a rumble and a rise at 1280x720 and 360x640.
+- **Not checked:** the owner hasn't played either version yet. On 360x640, Laury's "about to surge" bubble covers the left part of the tide line. Moving her bubble up during a surge, or skipping that quip, would fix it if it bothers the owner.
+- **Next ideas** (not agreed) are under "Suggestions from Claude" in ROADMAP.md: lava gauge, bat warnings, a replay of how the run ended with a tip, practice runs from a zone, a shell icon on the HUD.
 
 ## v0.7 (looks), live since 2026-11-14 (e0f844c)
 

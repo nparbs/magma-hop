@@ -15,7 +15,7 @@ ROADMAP.md lists what each feature does. What a developer needs:
 - **Checked:** 34 tests, typecheck, build, bot stats, `livecheck` (10), `laurycheck` (13), `musiccheck`, and screenshots of crust, a surge, the summit, the eruption, the win screen and the game-over line (desktop and 360x640).
   - The three check scripts now mark Laury's tutorial as seen (or skip the surge) so they test what they mean to.
 - **Not checked:** nobody has played it. No sound has been heard. Shimmer and shake haven't been watched in motion. 640x360 wasn't looked at for the Daily HUD.
-- **v0.6.1 (branch `v0.6.1`, not shipped):** fixed both known gaps. The win screen now plays `SUMMIT_SONG`, and the Daily board's "You" line shows a summit finisher's time. Setting switches use `setToggle` in `main.ts`: `.chip.toggle.on` draws a flickering pixel flame and `.off` draws ash, both as box-shadow sprites in `style.css`. The Summit song hasn't been heard.
+- **v0.6.1 (live since 2026-11-14, b0a7204):** fixed both known gaps. The win screen now plays `SUMMIT_SONG`, and the Daily board's "You" line shows a summit finisher's time. Setting switches use `setToggle` in `main.ts`: `.chip.toggle.on` draws a flickering pixel flame and `.off` draws ash, both as box-shadow sprites in `style.css`. The Summit song hasn't been heard.
 - **Tuning risk:** surges make the game a lot harder (bot numbers in ROADMAP.md). Soften them in the Ice Cap first if the owner finds it too hard.
 
 ## Where things stand (v0.5 and earlier)

@@ -20,6 +20,8 @@ async function open(viewport, touch = false) {
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto(URL);
   await page.waitForTimeout(800);
+  // Her lines during runs are rare and random; make every chance land so they can be checked.
+  await page.evaluate(() => (window.magmahop.lauryAlways = true));
   return page;
 }
 const state = (page) =>

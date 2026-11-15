@@ -1,6 +1,6 @@
 // Every sound is synthesized here, music included. No audio files.
 
-import { OVER_SONG, SUMMIT_SONG, TITLE_SONG, ZONE_SONGS, type Song } from './songs';
+import { OVER_SONGS, SUMMIT_SONG, TITLE_SONGS, ZONE_SONGS, onPass, type Song } from './songs';
 
 export class Sfx {
   private ctx: AudioContext | null = null;
@@ -169,6 +169,17 @@ export class Sfx {
   click(): void {
     this.tone(700, 900, 0.05, 'sine', 0.1);
   }
+  /**
+   * Laury's babble: one high little chirp per syllable, pitched by its vowel, so she sounds like
+   * she's chattering along without saying real words. `rise`: the end of a question or exclamation.
+   */
+  voice(vowel: string, rise: boolean): void {
+    const k = 'aeiouy'.indexOf(vowel.toLowerCase());
+    const f = 640 * [1, 1.19, 1.33, 0.89, 1.06, 1.26][Math.max(0, k)] * (0.96 + Math.random() * 0.08);
+    const to = rise ? f * 1.5 : f * 1.12;
+    this.tone(f, to, rise ? 0.12 : 0.07, 'triangle', 0.11);
+    this.tone(f * 2, to * 2, rise ? 0.1 : 0.05, 'sine', 0.035);
+  }
 }
 
 // ---------- Music: songs per zone and per screen, crossfaded ----------
@@ -176,8 +187,10 @@ export class Sfx {
 const MUSIC_VOL = 0.32;
 /** Crossfade between zones and screens, seconds. */
 const FADE_S = 2.5;
-/** How many times a zone song loops before the next one for that zone takes over. */
+/** How many times a song loops (A and B passes each count) before the next one for that cue takes over. */
 const ZONE_LOOPS = 4;
+/** The title and run-over screens rotate more slowly: people sit on them less. */
+const SCREEN_LOOPS = 8;
 
 const midiHz = (n: number) => 440 * Math.pow(2, (n - 69) / 12);
 
@@ -187,10 +200,14 @@ export type MusicCue = 'title' | 'over' | 'summit' | `zone${number}`;
 interface Track {
   cue: MusicCue;
   song: Song;
+  /** The song with its B section swapped in (the same song when it has none). */
+  songB: Song;
   bus: GainNode;
   step: number;
   next: number;
   loops: number;
+  /** Passes through the four bars so far: odd passes play the B section. */
+  pass: number;
   /** When it has faded out and stops being scheduled. */
   until: number;
 }
@@ -206,7 +223,9 @@ export class Music {
   private ducked = false;
   /** A throbbing layer on top of the song while the lava surges. */
   pulse = false;
-  /** The last song played for each cue, so a zone doesn't repeat the same one twice running. */
+  /** Songs not yet played for each cue: every song gets a turn before any repeats. */
+  private bags = new Map<string, Song[]>();
+  /** The last song played for each cue, so a refilled bag doesn't start with it. */
   private lastPick = new Map<string, Song>();
 
   constructor(private ctx: AudioContext, master: GainNode, private noiseBuf: AudioBuffer) {
@@ -247,14 +266,20 @@ export class Music {
   }
 
   private pick(cue: MusicCue): Song {
-    if (cue === 'title') return TITLE_SONG;
-    if (cue === 'over') return OVER_SONG;
     if (cue === 'summit') return SUMMIT_SONG;
-    const i = Math.max(0, Math.min(ZONE_SONGS.length - 1, Number(cue.slice(4)) || 0));
-    const list = ZONE_SONGS[i];
+    // The theme greets you the first time; after that the title shuffles like everything else.
+    if (cue === 'title' && !this.lastPick.has(cue)) {
+      this.lastPick.set(cue, TITLE_SONGS[0]);
+      return TITLE_SONGS[0];
+    }
+    const list = cue === 'title' ? TITLE_SONGS : cue === 'over' ? OVER_SONGS : ZONE_SONGS[Math.max(0, Math.min(ZONE_SONGS.length - 1, Number(cue.slice(4)) || 0))];
     const last = this.lastPick.get(cue);
-    const choices = list.length > 1 ? list.filter((s) => s !== last) : list;
-    const song = choices[Math.floor(Math.random() * choices.length)];
+    let bag = this.bags.get(cue);
+    if (!bag?.length) {
+      bag = list.length > 1 ? list.filter((s) => s !== last) : [...list];
+      this.bags.set(cue, bag);
+    }
+    const song = bag.splice(Math.floor(Math.random() * bag.length), 1)[0];
     this.lastPick.set(cue, song);
     return song;
   }
@@ -273,7 +298,8 @@ export class Music {
     bus.gain.setValueAtTime(0, now);
     bus.gain.linearRampToValueAtTime(1, now + (first ? 0.3 : FADE_S));
     bus.connect(this.muffle);
-    const t: Track = { cue, song, bus, step: 0, next: now + 0.05, loops: cue.startsWith('zone') ? ZONE_LOOPS : Infinity, until: Infinity };
+    const loops = cue.startsWith('zone') ? ZONE_LOOPS : cue === 'summit' ? Infinity : SCREEN_LOOPS;
+    const t: Track = { cue, song, songB: onPass(song, 1), bus, step: 0, next: now + 0.05, loops, pass: 0, until: Infinity };
     this.tracks.push(t);
     this.current = t;
     if (!this.timer) this.timer = window.setInterval(() => this.schedule(), 40);
@@ -300,10 +326,11 @@ export class Music {
           window.setTimeout(() => t.bus.disconnect(), 3000);
           break;
         }
-        if (this.on) this.playStep(t.song, t.bus, t.step, t.next);
+        if (this.on) this.playStep(t.pass % 2 ? t.songB : t.song, t.bus, t.step, t.next);
         t.step = (t.step + 1) % 64;
         t.next += 60 / t.song.bpm / 4;
-        // A zone song that has looped enough hands over to another song for the same zone.
+        if (t.step === 0) t.pass++;
+        // A song that has looped enough hands over to another song for the same cue.
         if (t.step === 0 && t === this.current && --t.loops <= 0) {
           this.switchTo(t.cue, this.pick(t.cue));
         }

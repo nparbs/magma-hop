@@ -6,6 +6,8 @@
 import type { LauryArt } from './render';
 
 const TYPE_SPEED = 45; // characters a second
+const VOWEL = /[aeiouy]/i;
+const VOICE_GAP = 0.085; // seconds between chirps at the least
 
 export class Laury {
   private line = '';
@@ -93,14 +95,36 @@ export class Laury {
     this.root.classList.add('show');
   }
 
+  /** Her voice: called once per syllable as it types out (see Sfx.voice). */
+  onVoice: ((vowel: string, rise: boolean) => void) | null = null;
+  private lastVoice = -1;
+
+  /** One chirp for the first new syllable typed this frame: a vowel that starts a vowel run. */
+  private babble(from: number, to: number): void {
+    if (!this.onVoice || this.time - this.lastVoice < VOICE_GAP) return;
+    const l = this.line;
+    for (let i = from; i < to; i++) {
+      if (!VOWEL.test(l[i]) || (i > 0 && VOWEL.test(l[i - 1]))) continue;
+      // The last syllable before ! or ? goes up at the end.
+      const rest = l.slice(i + 1);
+      const rise = /^[a-z']*[!?]/i.test(rest) && !/[aeiouy]/i.test(rest.replace(/[!?].*$/, ''));
+      this.onVoice(l[i], rise);
+      this.lastVoice = this.time;
+      return;
+    }
+  }
+
   /** Call every frame. `calm` keeps her still. */
   update(dt: number, calm: boolean): void {
     if (!this.showing) return;
     this.time += dt;
     this.wave = Math.max(0, this.wave - dt);
     if (this.typed < this.line.length) {
+      const from = Math.floor(this.typed);
       this.typed = Math.min(this.line.length, this.typed + dt * TYPE_SPEED);
-      this.textEl.textContent = this.line.slice(0, Math.floor(this.typed));
+      const to = Math.floor(this.typed);
+      this.textEl.textContent = this.line.slice(0, to);
+      this.babble(from, to);
     } else {
       this.textEl.textContent = this.line;
       if (!this.touring && this.hold > 0) {

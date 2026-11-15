@@ -8,7 +8,7 @@ There's also a Daily Climb (the same volcano for everyone each UTC day, with its
 
 Anyone playing the same mode at the same time shows up live: beside you on the Daily Climb's shared volcano, or as a notch at their height on the wall in endless runs (everyone has their own volcano there).
 
-Laury, a volcanologist with a brown ponytail, shows you around the first time you try each mode, then pops in with a joke at the start of later runs and checks in every so often at 500 m marks.
+Ash, a volcanologist with a brown ponytail, shows you around the first time you try each mode, then rarely pops in during a run (at most twice, a minute apart) with a chirpy babble voice. In the code she's still `laury` (her name until 2026-11-15).
 
 Vanilla TypeScript and Canvas 2D on the page, Node and SQLite on the server. The pixel art, the sound effects and the music are all made in code.
 

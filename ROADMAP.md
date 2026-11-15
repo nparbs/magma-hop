@@ -186,7 +186,17 @@ Ideas that would make deaths feel fairer without making the game easier.
 The owner picked this from Claude's suggestions on 2026-11-15, and said the v0.7.1 surge numbers are about right.
 
 - [x] **Tide line.** From the rumble until the lava gets there, a dashed glowing line marks where the surge will stop. It follows your best height, just as the lava will. It fades in over half a second and pulses (steady with calm effects). Display only, no sim change.
-- [ ] Owner playtest. On phones, Laury's rumble line can cover the left end of the tide line.
+- [x] Owner playtest. On phones, Laury's rumble line could cover the left end of the tide line (fixed in v0.8.0: her bubble moved to the top).
+
+## v0.8.0 — Ash, and more music (2026-11-15)
+
+All asked for by the owner on 2026-11-15.
+
+- [x] **Ash.** The guide is renamed from Laury to Ash, the owner's pick from Claude's list (code keeps `laury` names). Her bubble sits at the top right, out of the climber's way. Tutorial Next/Skip sit on the right edge halfway down, where a right thumb rests (lower right on short landscape screens).
+- [x] **Rarer.** During runs she says at most two lines, never within a minute of each other (across runs too), and each trigger is a small chance. The tutorials and the summit line are unchanged.
+- [x] **Voice.** A chirpy babble, one blip per syllable as her text types out, rising on the last syllable before ! or ?. Uses the sound mute.
+- [x] **More music.** 18 new songs (six per zone in the Magma Chamber, four or five elsewhere, three each for the title and run-over screens), and every song has a B section, so it plays A B A B. Each cue shuffles through all its songs before repeating. The title theme still plays first.
+- [ ] Owner playtest: the new songs and Ash's voice haven't been heard by anyone yet.
 
 ## Later ideas (not agreed)
 

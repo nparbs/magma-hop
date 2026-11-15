@@ -293,7 +293,7 @@ setInterval(() => {
   if (mode === 'title' && !document.hidden) void refreshLiveNote();
 }, 10_000);
 
-// Laury: a first-time tutorial per mode, a joke at the start of later runs, check-ins every 500 m.
+// Laury: a first-time tutorial per mode, then only a rare line during runs (see lauryChat), with a chirpy voice.
 const laury = new Laury(
   $('laury'),
   new LauryArt($<HTMLCanvasElement>('lauryArt')),
@@ -302,6 +302,7 @@ const laury = new Laury(
   $<HTMLButtonElement>('lauryNext'),
   $<HTMLButtonElement>('laurySkip'),
 );
+laury.onVoice = (vowel, rise) => sfx.voice(vowel, rise);
 let lauryOn = store.get('laury') !== '0';
 const lauryLabel = () => setToggle($('lauryBtn'), lauryOn);
 lauryLabel();
@@ -334,6 +335,23 @@ function lauryPick(list: string[]): string {
   lauryRecent = [l, ...lauryRecent.filter((x) => x !== l)].slice(0, 12);
   store.set('lauryRecent', JSON.stringify(lauryRecent));
   return l;
+}
+/** Laury is a rare treat during runs: at most this many lines a run... */
+const LAURY_RUN_MAX = 2;
+/** ...and never two within this long, across runs too, so quick restarts don't bring her back each time. */
+const LAURY_GAP_MS = 60000;
+let lauryRunSaid = 0;
+let lauryLastSaid = -1e9;
+/** Headless checks set this to make every chance land and drop the limits. */
+let lauryAlways = false;
+/** Maybe say a line during a run: `chance` of it, within the limits above. */
+function lauryChat(chance: number, line: () => string): void {
+  if (!lauryOn || mode !== 'play') return;
+  const t = performance.now();
+  if (!lauryAlways && (lauryRunSaid >= LAURY_RUN_MAX || t - lauryLastSaid < LAURY_GAP_MS || Math.random() >= chance)) return;
+  lauryRunSaid++;
+  lauryLastSaid = t;
+  laury.say(line());
 }
 function startLine(kind: 'endless' | 'daily'): string {
   const after = AFTER[store.get('lastCause') ?? ''];
@@ -466,6 +484,7 @@ function resetWorld(seed: number): void {
   live.leave();
   laury.finish();
   nextCheckIn = 500;
+  lauryRunSaid = 0;
   rumbles = 0;
   lastSurge = 'none';
   nearLava = false;
@@ -522,7 +541,7 @@ async function startGame(kind: 'endless' | 'daily' = lastKind): Promise<void> {
     if (quip && lauryOn) {
       const forSim = sim;
       window.setTimeout(() => {
-        if (sim === forSim && mode === 'play' && lauryOn) laury.say(startLine(kind));
+        if (sim === forSim) lauryChat(0.2, () => startLine(kind));
       }, 500);
     }
   };
@@ -735,7 +754,7 @@ function handleEvents(): void {
     else if (e.t === 'warn') sfx.warn();
     else if (e.t === 'rumble') {
       sfx.rumble();
-      if (mode === 'play' && lauryOn && (rumbles++ === 0 || Math.random() < 1 / 3)) laury.say(lauryPick(RUMBLE));
+      lauryChat(rumbles++ === 0 ? 0.3 : 0.15, () => lauryPick(RUMBLE));
     } else if (e.t === 'surge') sfx.surge();
     else if (e.t === 'melt') sfx.melt();
     else if (e.t === 'summit') sfx.fanfare();
@@ -808,28 +827,28 @@ function updateHud(): void {
   ui.wind.classList.toggle('hidden', g === 0);
   if (g) ui.wind.textContent = g > 0 ? 'Gust ≫' : '≪ Gust';
 
-  // Laury checks in at 500 m marks: always at the first two, then now and then.
+  // Laury might check in at 500 m marks: likelier at the first two.
   if (mode === 'play' && max >= nextCheckIn) {
     let mark = 0;
     while (max >= nextCheckIn) {
       mark = nextCheckIn;
       nextCheckIn += 500;
     }
-    if (lauryOn && (mark <= 1000 || Math.random() < 0.5)) laury.say(MILESTONE[mark] ?? lauryPick(CHECK_IN).replace('{h}', fmt(mark)));
+    lauryChat(mark <= 1000 ? 0.35 : 0.2, () => MILESTONE[mark] ?? lauryPick(CHECK_IN).replace('{h}', fmt(mark)));
   }
 
   if (mode === 'play' && !sim.dead) {
     // Laury on eruptions: a surge survived, and a close brush with the lava.
-    if (lastSurge !== 'none' && sim.surge === 'none' && lauryOn && Math.random() < 0.5) laury.say(lauryPick(SURGE_SURVIVED));
+    if (lastSurge !== 'none' && sim.surge === 'none') lauryChat(0.15, () => lauryPick(SURGE_SURVIVED));
     lastSurge = sim.surge;
     const gap = (sim.y - sim.lavaY) / UNITS_PER_METER;
     if (gap < 3) nearLava = true;
     else if (nearLava && gap >= 10) {
       nearLava = false;
       const t = performance.now();
-      if (t - lastNearMiss >= 20000 && lauryOn) {
+      if (t - lastNearMiss >= 20000) {
         lastNearMiss = t;
-        laury.say(lauryPick(NEAR_MISS));
+        lauryChat(0.25, () => lauryPick(NEAR_MISS));
       }
     }
   }
@@ -933,6 +952,10 @@ function frame(now: number): void {
     return ghost;
   },
   laury,
+  /** Checks only: make every Laury chance land, with no per-run limits. */
+  set lauryAlways(on: boolean) {
+    lauryAlways = on;
+  },
   get live() {
     return live;
   },

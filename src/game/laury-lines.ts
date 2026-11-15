@@ -1,9 +1,9 @@
-// What Laury says. Plain data, so it's easy to add jokes. `{h}` in a check-in line becomes the height.
+// What Ash says (the guide was called Laury until 2026-11-15; code names still say laury). Plain data, so it's easy to add jokes. `{h}` in a check-in line becomes the height.
 
 /** Her first-time walk-through of the basics. `touch`/`tilt` pick how steering is explained. */
 export function basicsTour(touch: boolean): string[] {
   return [
-    "Hi! I'm Laury. I study this volcano. Mostly I study running away from it.",
+    "Hi! I'm Ash. Yes, really. I study this volcano. Mostly I study running away from it.",
     touch
       ? 'You bounce all by yourself. Just steer: hold the left or right side of the screen. Or turn on Tilt and lean your phone.'
       : 'You bounce all by yourself. Just steer with ← → or A / D. A gamepad works too.',

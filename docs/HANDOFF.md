@@ -1,8 +1,8 @@
 # Handoff
 
-Last updated 2026-11-14. Live is **v0.5.0** (commit c0494be), shipped 2026-11-14. **v0.6.0 is built on branch `v0.6-eruption`, not committed and not shipped.** Read ROADMAP.md for the plan and the decisions the owner has made, CLAUDE.md for the working rules, and docs/hosting.md for the server.
+Last updated 2026-11-14. Live is **v0.6.0** (commit ff8a795), shipped 2026-11-14 at the owner's request before their playtest. Read ROADMAP.md for the plan and the decisions the owner has made, CLAUDE.md for the working rules, and docs/hosting.md for the server.
 
-## v0.6 (eruption), waiting on the owner
+## v0.6 (eruption), live, not yet played by the owner
 
 ROADMAP.md lists what each feature does. What a developer needs:
 
@@ -82,7 +82,7 @@ ROADMAP.md lists what each feature does. What a developer needs:
 ## Open
 
 - Owner playtest of v0.5 with a second player, and of Laury.
-- Owner playtest of v0.6, then commit, merge to `main` and ship when asked.
+- Owner playtest of v0.6 (live since 2026-11-14), and the two known small gaps above.
 - The questions in ROADMAP.md: whether quitting from the pause menu should count, the weekly reset time, and the Daily Climb's UTC changeover.
 - A tuning pass on hazards and ledge rates, waiting on more of the owner's play.
 - Adding Magma Hop to the parbs.online landing page.

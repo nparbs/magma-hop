@@ -141,7 +141,7 @@ Laury, the tutorial guide (asked for by the owner on 2026-11-14):
 - [x] Never blocks steering during play (the bubble ignores touches). **Laury on/off** on the title screen and in the pause menu; How to play has a button to see her tutorial again.
 - [x] Her lines are data in `src/game/laury-lines.ts`. `scripts/laurycheck.mjs` checks the whole flow headless.
 
-## v0.6 — eruption (built 2026-11-14 on branch `v0.6-eruption`, not shipped)
+## v0.6 — eruption (live since 2026-11-14)
 
 Asked for by the owner on 2026-11-14, to lean into the volcano theme.
 

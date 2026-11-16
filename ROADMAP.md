@@ -224,7 +224,7 @@ The owner asked for a more professional UI that still fits, and picked "carved s
 ## Code review (2026-11-15)
 
 A short, partial read of the code (mostly server and network paths), not a full audit.
-The server fix shipped in v0.8.2; the gamepad fix is committed but not yet shipped.
+The server fix shipped in v0.8.2; the gamepad fix in v0.8.3.
 
 - [x] A request for a malformed path (`/%E0` or `//`) threw inside the request handler and stopped the server. It now answers 400.
 - [x] Title and game-over screens started a run on a held gamepad button, without the fresh-press check the intro uses. Holding the button through a death skipped the result screen. Now they need a fresh press too (owner said to do what Claude thought best, 2026-11-16).

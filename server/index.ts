@@ -53,8 +53,14 @@ const MIME: Record<string, string> = {
 };
 
 function serveStatic(req: http.IncomingMessage, res: http.ServerResponse): void {
-  const url = new URL(req.url ?? '/', 'http://x');
-  let rel = decodeURIComponent(url.pathname);
+  let rel: string;
+  try {
+    rel = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname);
+  } catch {
+    // A request target that is not a URL (//) or has a bad escape (/%E0) would otherwise throw out of the request handler and stop the server.
+    res.writeHead(400).end();
+    return;
+  }
   if (rel.endsWith('/')) rel += 'index.html';
   const file = path.resolve(STATIC_DIR, '.' + rel);
   if (!file.startsWith(STATIC_DIR + path.sep)) {
@@ -308,7 +314,14 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
 }
 
 const server = http.createServer((req, res) => {
-  const url = new URL(req.url ?? '/', 'http://x');
+  let url: URL;
+  try {
+    url = new URL(req.url ?? '/', 'http://x');
+  } catch {
+    // A request target like // is not a URL; uncaught, the throw would stop the server.
+    res.writeHead(400).end();
+    return;
+  }
   if (url.pathname === '/health') {
     return send(res, 200, { ok: true, version: __APP_VERSION__, sim: SIM_VERSION, climbers: store.climbers(), pending: pending.size, live: live.size });
   }

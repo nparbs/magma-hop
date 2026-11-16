@@ -938,11 +938,13 @@ function frame(now: number): void {
   // Calm effects keep Pip still on the logo.
   if (mode === 'title') logo.draw(calm ? 0.3 : now / 1000);
   music();
-  // Gamepad: a fresh press moves Laury along; holding it doesn't skip her whole tutorial.
+  // Gamepad: act on a fresh press only, so holding it doesn't skip Laury's whole tutorial
+  // or, held through a death, skip the result screen straight into a new run.
   const pad = input.padConfirm();
+  const press = pad && !padHeld;
   if (mode === 'intro') {
-    if (pad && !padHeld) laury.next();
-  } else if (pad && (mode === 'title' || mode === 'over')) void startGame(mode === 'title' ? 'endless' : lastKind);
+    if (press) laury.next();
+  } else if (press && (mode === 'title' || mode === 'over')) void startGame(mode === 'title' ? 'endless' : lastKind);
   padHeld = pad;
   requestAnimationFrame(frame);
 }
